@@ -12,13 +12,16 @@ We investigate quantum-kernel SVMs using the Pegasos algorithm for fake news det
 
 ## Repository Structure
 
-- **`new_research/`**: The primary research pipeline.
-  - `run_all.py`: The central execution script for running experiments, generating tables, and creating plots.
-  - `qmlfakenews/`: Core library containing implementations for quantum feature maps, Pegasos optimizer, kernel diagnostics, and data preprocessing.
-  - `outputs/`: contains raw empirical results in CSV format, including seed sweeps and noise robustness profiles.
-- **`high_res_figures/`**: Publication-ready, 300 DPI scatter plots and line charts showcasing geometric correlations and convergence trajectories.
-- **`pvqc_*.ipynb`**: Original experimental Jupyter notebooks used for initial sweeps and algorithm prototyping (Pauli, Z, ZZ, and Qiskit-based variants).
-- **`extract_nb.py`**: A utility script used to reliably extract empirical metrics and cell outputs from the research notebooks for validation.
+- **`qmlfakenews/`**: Core Python library containing implementations for quantum feature maps, Pegasos optimizer, kernel diagnostics, and data preprocessing.
+- **`scripts/`**: The execution scripts for the pipeline.
+  - `run_all.py`: The central execution script for running experiments, generating tables, and creating the Word document (`paper_draft.docx`).
+  - `generate_variance.py`: Utility to compute quantum diagnostic variances across data subsets.
+  - `verify_results.py`: Independent script to cross-check regression and correlation statistics.
+  - `extract_nb.py`: Utility to reliably extract empirical metrics from research notebooks.
+- **`outputs/`**: Contains raw empirical results in CSV format, including seed sweeps and noise robustness profiles.
+  - `high_res_figures/`: Publication-ready, 300 DPI scatter plots and line charts showcasing geometric correlations.
+- **`notebooks/`**: Original exploratory Jupyter notebooks (`pvqc_*.ipynb`) used for initial sweeps and algorithm prototyping.
+- **`data/`**: Directory for datasets (e.g. `facebook-fact-check.csv`).
 
 ## Key Results
 - **Geometric Correlation**: Confirmed that Gram matrix conditioning is a stronger predictor of stability than alignment alone.
