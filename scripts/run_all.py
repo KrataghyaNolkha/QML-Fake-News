@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import platform
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import pandas as pd
@@ -74,6 +76,48 @@ def main() -> None:
             preset=preset,
             verbose=not bool(args.quiet),
         )
+        def package_version(name: str) -> str | None:
+            try:
+                return version(name)
+            except PackageNotFoundError:
+                return None
+
+        run_manifest = {
+            "dataset_path": str(data_csv),
+            "dataset_samples": summary.get("n_samples"),
+            "random_seed_main": 42,
+            "split": {"test_size": 0.25, "stratified": True},
+            "preset": preset,
+            "quick": bool(args.quick),
+            "pca_components": [2, 3, 4] if args.full else ([2] if args.quick else [2, 3, 4]),
+            "qubits": [2, 3, 4] if args.full else ([2] if args.quick else [2, 3]),
+            "feature_maps": ["z", "zz", "pauli_xyz", "ry_custom"],
+            "repetitions": [1, 2, 4, 6] if args.full else ([2] if args.quick else [1, 2, 3]),
+            "pegasos_iterations_main": 200 if args.full else (60 if args.quick else 90),
+            "pegasos_lambda": 0.02,
+            "geometry_subset_n": 400 if args.full else (200 if args.quick else 250),
+            "condition_number": "largest positive eigenvalue / smallest positive eigenvalue after centering and diagonal ridge 1e-8",
+            "spectral_gap": "largest eigenvalue - second-largest eigenvalue after centering and diagonal ridge 1e-8",
+            "noise": {
+                "probabilities": [0.0, 0.001, 0.005, 0.01, 0.02] if args.full else ([0.0] if args.quick else [0.0, 0.01, 0.03, 0.05, 0.1]),
+                "shots": 512 if args.full else (512 if args.quick else 512),
+                "pegasos_iterations": 40 if args.full else (40 if args.quick else 40),
+                "stratified_training_subset_n": 60 if args.full else min(60, 200 if args.quick else 250),
+                "kernel_statistics_subset_n": 30,
+                "test_split": "full held-out test split",
+                "simulator": "AerSimulator with depolarizing gate errors",
+            },
+            "software": {
+                "python": platform.python_version(),
+                "numpy": package_version("numpy"),
+                "pandas": package_version("pandas"),
+                "scikit_learn": package_version("scikit-learn"),
+                "qiskit": package_version("qiskit"),
+                "qiskit_machine_learning": package_version("qiskit-machine-learning"),
+                "qiskit_aer": package_version("qiskit-aer"),
+            },
+        }
+        (outputs_dir / "run_manifest.json").write_text(json.dumps(run_manifest, indent=2))
 
     # Load produced tables
     baselines_2d = _safe_read_csv(outputs_dir / "tables" / "baselines_pca2.csv")

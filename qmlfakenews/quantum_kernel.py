@@ -8,6 +8,48 @@ import numpy as np
 from .feature_maps import FeatureMapName, build_feature_map
 
 
+class StatevectorQuantumKernel:
+    """Ideal fidelity kernel evaluated from cached feature-map statevectors.
+
+    For a unitary feature map, the fidelity kernel is
+    ``|<phi(x)|phi(y)>|**2``. Computing each state once avoids repeatedly
+    simulating the same feature-map circuits for every Pegasos update.
+    """
+
+    def __init__(self, feature_map):
+        from qiskit.quantum_info import Statevector
+
+        self.feature_map = feature_map
+        self._Statevector = Statevector
+        self._parameters = tuple(feature_map.parameters)
+        self._state_cache: dict[tuple[float, ...], np.ndarray] = {}
+
+    def _states(self, X: np.ndarray) -> np.ndarray:
+        X = np.asarray(X, dtype=float)
+        if X.ndim != 2 or X.shape[1] != len(self._parameters):
+            raise ValueError(
+                f"Expected a 2D input with {len(self._parameters)} features; got {X.shape}."
+            )
+        states = []
+        for row in X:
+            key = tuple(float(v) for v in row)
+            state = self._state_cache.get(key)
+            if state is None:
+                bound = self.feature_map.assign_parameters(dict(zip(self._parameters, row)), inplace=False)
+                state = np.asarray(self._Statevector.from_instruction(bound).data, dtype=complex)
+                self._state_cache[key] = state
+            states.append(state)
+        return np.asarray(states, dtype=complex)
+
+    def evaluate(self, x_vec: np.ndarray, y_vec: Optional[np.ndarray] = None) -> np.ndarray:
+        X = np.asarray(x_vec, dtype=float)
+        Y = X if y_vec is None else np.asarray(y_vec, dtype=float)
+        left = self._states(X)
+        right = left if y_vec is None else self._states(Y)
+        overlaps = left.conj() @ right.T
+        return np.abs(overlaps) ** 2
+
+
 @dataclass
 class QuantumKernelFactory:
     feature_map_name: FeatureMapName
@@ -35,10 +77,10 @@ class QuantumKernelFactory:
             fidelity = ComputeUncompute(sampler=sampler, shots=self.shots, transpiler=transpiler)
             return FidelityQuantumKernel(feature_map=feature_map, fidelity=fidelity)
 
-        # Ideal/statevector path (fast for small qubits)
-        from qiskit_machine_learning.kernels import FidelityQuantumKernel
-
-        return FidelityQuantumKernel(feature_map=feature_map)
+        # Ideal/statevector path: cache one statevector per input and form
+        # fidelities with a matrix multiplication. This is equivalent to the
+        # ideal FidelityQuantumKernel and practical for full-data Gram matrices.
+        return StatevectorQuantumKernel(feature_map=feature_map)
 
 
 def _build_noisy_sampler(*, noise_prob: float, shots: Optional[int], seed: int):

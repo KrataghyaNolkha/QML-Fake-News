@@ -34,6 +34,15 @@ class SpectrumStats:
 
 
 def spectrum_stats(K: NDArray[np.floating], *, centered: bool = True, ridge: float = 1e-8) -> SpectrumStats:
+    K = np.asarray(K, dtype=float)
+    if K.ndim != 2 or K.shape[0] != K.shape[1]:
+        raise ValueError("Kernel matrix must be a square 2D array.")
+    if K.shape[0] == 0:
+        raise ValueError("Kernel matrix must not be empty.")
+    if not np.isfinite(K).all():
+        raise ValueError("Kernel matrix must contain only finite values.")
+    if ridge < 0:
+        raise ValueError("ridge must be non-negative.")
     K_use = center_gram(K) if centered else K
 
     # Ensure symmetric
@@ -42,8 +51,9 @@ def spectrum_stats(K: NDArray[np.floating], *, centered: bool = True, ridge: flo
     # Ridge for numerical stability
     K_sym = K_sym + ridge * np.eye(K_sym.shape[0])
 
-    evals = np.linalg.eigvalsh(K_sym)
-    evals_sorted = np.sort(evals)[::-1]
+    # eigh returns ascending order; make the descending order explicit so
+    # lambda_1 - lambda_2 is always the non-negative leading eigengap.
+    evals_sorted = np.linalg.eigvalsh(K_sym)[::-1]
 
     if evals_sorted.size >= 2:
         gap = float(evals_sorted[0] - evals_sorted[1])
