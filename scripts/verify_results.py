@@ -61,15 +61,11 @@ print(f"Shapiro-Wilk test on residuals: W={stat:.3f}, p={p_res:.3f}")
 # 3. Replicate Discrepancy / Outlier Processing
 print("\n--- STEP 7: PEARSON/SPEARMAN DISCREPANCY ---")
 df_corr = pd.read_csv(repo_root / 'outputs' / 'tables' / 'kernel_geometry_correlations.csv')
-print("Extracted directly from kernel_geometry_correlations.csv:")
-
-with_outliers = df_corr[df_corr['metric'] == 'log10_condition_number']
-without_outliers = df_corr[df_corr['metric'] == 'log10_condition_number (no outliers)']
-
-print("\n1. With all points (n=19):")
-print(f"Pearson r: {with_outliers['pearson_r'].values[0]:.3f}")
-print(f"Spearman r: {with_outliers['spearman_r'].values[0]:.3f}")
-
-print("\n2. Without outliers (n=17):")
-print(f"Pearson r: {without_outliers['pearson_r'].values[0]:.3f}")
-print(f"Spearman r: {without_outliers['spearman_r'].values[0]:.3f}")
+print("\n--- GEOMETRY CORRELATION RECONCILIATION ---")
+cond = df_corr[df_corr['metric'].eq('log10_condition_number')]
+for _, row in cond.iterrows():
+    treatment = row.get('outlier_handling', 'unspecified')
+    print(
+        f"{treatment}: n={int(row['n'])}, Pearson r={row['pearson_r']:.3f}, "
+        f"Spearman rho={row['spearman_r']:.3f}"
+    )

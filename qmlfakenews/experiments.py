@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.stats import pearsonr, spearmanr, norm
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.datasets import load_breast_cancer
 
@@ -118,12 +119,12 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
         qubits_grid = (2, 3, 4)
         noise_grid = (0.0, 0.001, 0.005, 0.01, 0.02)
         iters_main = 200
-        iters_noise = 120
+        iters_noise = 40
         diag_n = 400
         reps_grid = (1, 2, 4, 6)
         viz_n = 70
         eval_subset_n = 300
-        shots_noise = 2048
+        shots_noise = 512
         seeds_grid = tuple(range(10))
 
     diag_n = min(diag_n, split.X_train.shape[0])
@@ -428,23 +429,61 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
         g_use["log10_condition_number"] = np.log10(g_use["condition_number"])
         metrics = ["kernel_alignment", "log10_condition_number", "spectral_gap", "effective_rank", "leading_eigen_ratio"]
         for metric in metrics:
-            pearson = float(g_use[[metric, "accuracy"]].corr(method="pearson").iloc[0, 1])
-            spearman = float(g_use[[metric, "accuracy"]].corr(method="spearman").iloc[0, 1])
-            corr_rows.append({"metric": metric, "target": "accuracy", "pearson_r": pearson, "spearman_r": spearman, "n": int(g_use.shape[0])})
+            pearson_result = pearsonr(g_use[metric].to_numpy(dtype=float), g_use["accuracy"].to_numpy(dtype=float))
+            spearman_result = spearmanr(g_use[metric].to_numpy(dtype=float), g_use["accuracy"].to_numpy(dtype=float))
+            pearson = float(pearson_result.statistic)
+            spearman = float(spearman_result.statistic)
+            n_corr = int(g_use.shape[0])
+            if n_corr > 3 and abs(pearson) < 1:
+                z = np.arctanh(pearson)
+                half_width = float(norm.ppf(0.975) / np.sqrt(n_corr - 3))
+                pearson_ci_low, pearson_ci_high = (float(np.tanh(z - half_width)), float(np.tanh(z + half_width)))
+            else:
+                pearson_ci_low, pearson_ci_high = (float("nan"), float("nan"))
+            corr_rows.append({
+                "metric": metric,
+                "target": "accuracy",
+                "transformation": "log10(condition_number)" if metric == "log10_condition_number" else "none",
+                "outlier_handling": "all configurations",
+                "outlier_rule": "none",
+                "pearson_r": pearson,
+                "pearson_p": float(pearson_result.pvalue),
+                "pearson_ci95_low": pearson_ci_low,
+                "pearson_ci95_high": pearson_ci_high,
+                "spearman_r": spearman,
+                "spearman_p": float(spearman_result.pvalue),
+                "n": n_corr,
+            })
         
         # Outlier analysis for log10_condition_number
         z_scores = np.abs((g_use['log10_condition_number'] - g_use['log10_condition_number'].mean()) / g_use['log10_condition_number'].std())
         outliers = g_use[z_scores > 2.0]
         if not outliers.empty:
             g_no_outliers = g_use[z_scores <= 2.0]
-            p_no = float(g_no_outliers[["log10_condition_number", "accuracy"]].corr(method="pearson").iloc[0, 1])
-            s_no = float(g_no_outliers[["log10_condition_number", "accuracy"]].corr(method="spearman").iloc[0, 1])
+            pearson_no = pearsonr(g_no_outliers["log10_condition_number"], g_no_outliers["accuracy"])
+            spearman_no = spearmanr(g_no_outliers["log10_condition_number"], g_no_outliers["accuracy"])
+            p_no = float(pearson_no.statistic)
+            s_no = float(spearman_no.statistic)
+            n_no = int(g_no_outliers.shape[0])
+            if n_no > 3 and abs(p_no) < 1:
+                z_no = np.arctanh(p_no)
+                h_no = float(norm.ppf(0.975) / np.sqrt(n_no - 3))
+                ci_no_low, ci_no_high = (float(np.tanh(z_no - h_no)), float(np.tanh(z_no + h_no)))
+            else:
+                ci_no_low, ci_no_high = (float("nan"), float("nan"))
             corr_rows.append({
-                "metric": "log10_condition_number (no outliers)", 
-                "target": "accuracy", 
-                "pearson_r": p_no, 
-                "spearman_r": s_no, 
-                "n": int(g_no_outliers.shape[0])
+                "metric": "log10_condition_number",
+                "target": "accuracy",
+                "transformation": "log10(condition_number)",
+                "outlier_handling": "excluded by absolute z-score > 2",
+                "outlier_rule": "absolute z-score > 2 on log10(condition_number)",
+                "pearson_r": p_no,
+                "pearson_p": float(pearson_no.pvalue),
+                "pearson_ci95_low": ci_no_low,
+                "pearson_ci95_high": ci_no_high,
+                "spearman_r": s_no,
+                "spearman_p": float(spearman_no.pvalue),
+                "n": n_no,
             })
             
     pd.DataFrame(corr_rows).to_csv(outputs_dir / "tables" / "kernel_geometry_correlations.csv", index=False)
@@ -604,7 +643,17 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
         Xq_train = pad_or_trim_features(pca_q.X_train, 2)
         Xq_test = pad_or_trim_features(pca_q.X_test, 2)
 
-        # Small subset for kernel-level stats (kept tiny for runtime)
+        # Noisy, finite-shot simulation is substantially more expensive than
+        # the ideal statevector experiment. Train this stress-test model on a
+        # fixed stratified subset of the full training split and evaluate it on
+        # the complete held-out split. Report both subset sizes in the table.
+        noise_train_n = min(60, Xq_train.shape[0])
+        sss_train_noise = StratifiedShuffleSplit(n_splits=1, train_size=noise_train_n, random_state=seed + 6)
+        noise_train_idx, _ = next(sss_train_noise.split(Xq_train, split.y_train))
+        X_noise_train = Xq_train[noise_train_idx]
+        y_noise_train = split.y_train[noise_train_idx]
+
+        # Small subset for kernel-level statistics (kept tiny for runtime).
         noise_viz_n = min(30, Xq_train.shape[0])
         sss_noise = StratifiedShuffleSplit(n_splits=1, train_size=noise_viz_n, random_state=seed + 7)
         noise_idx, _ = next(sss_noise.split(Xq_train, split.y_train))
@@ -620,12 +669,16 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
                 shots=int(shots_noise),
             ).build()
             pegasos = KernelPegasosSVM(kernel, lambda_reg=0.02, iterations=iters_noise, seed=seed)
-            pegasos.fit(Xq_train, split.y_train, X_test=Xq_test, y_test=split.y_test, eval_every=0)
+            pegasos.fit(X_noise_train, y_noise_train, X_test=Xq_test, y_test=split.y_test, eval_every=0)
             acc = float(np.mean(pegasos.predict(Xq_test) == split.y_test))
 
             # Kernel-level evidence: gram statistics should degrade as p increases
             try:
                 K_noise = np.asarray(kernel.evaluate(x_vec=X_noise, y_vec=X_noise), dtype=float)
+                # Finite-shot fidelity estimates are probabilities; clip small
+                # sampler overages to the valid probability interval before
+                # reporting extrema and means.
+                K_noise = np.clip(K_noise, 0.0, 1.0)
                 k_min = float(np.min(K_noise))
                 k_max = float(np.max(K_noise))
                 k_mean = float(np.mean(K_noise))
@@ -640,6 +693,7 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
                     "k_mean": k_mean,
                     "k_max": k_max,
                     "shots": int(shots_noise),
+                    "noise_train_n": int(noise_train_n),
                     "subset_n": int(noise_viz_n),
                 }
             )

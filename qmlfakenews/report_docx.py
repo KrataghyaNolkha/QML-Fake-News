@@ -9,6 +9,10 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from docx import Document
 from docx.shared import Inches
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.text import WD_COLOR_INDEX
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -49,6 +53,9 @@ def write_paper_docx(
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     doc = Document()
+    doc.core_properties.author = "Anonymous"
+    doc.core_properties.last_modified_by = "Anonymous"
+    doc.core_properties.title = "Geometry-Aware Analysis of Quantum Kernels for Fake News Detection"
 
     doc.add_heading("Geometry-Aware Analysis of Quantum Kernels for Fake News Detection", level=0)
     doc.add_paragraph(f"Final manuscript — {date.today().isoformat()}")
@@ -56,19 +63,18 @@ def write_paper_docx(
     doc.add_heading("Abstract", level=1)
     doc.add_paragraph(
         "We study quantum-kernel SVMs for fake news detection from structured engagement metadata, focusing on mechanistic explanations rather than application-only accuracy. "
-        "Our thesis is that quantum-kernel performance is governed more by kernel geometry, including label alignment, spectrum, and numerical conditioning, than by feature-map choice alone. "
-        "We compute geometry diagnostics on Gram-matrix subsets and correlate them with test accuracy across feature maps, depths (reps), and qubit counts. "
+        "We examine whether quantum-kernel performance is associated with kernel geometry, including label alignment, spectrum, and numerical conditioning. "
+        "We compute geometry diagnostics on Gram-matrix subsets and report exploratory associations with test accuracy across the configurations evaluated. "
         "We benchmark against strong classical baselines on matched representations (PCA(2), full features, and a 20+ feature expansion), sweep the PCA–qubits bottleneck, "
-        "and evaluate depolarizing-noise robustness in Aer for NISQ relevance. Across seed sweeps, the quantum solution also uses about 25x fewer support vectors than the classical RBF baseline."
+        "and evaluate modeled depolarizing noise in a classical simulator. On the PCA(2) representation, quantum-kernel accuracy is comparable to the RBF baseline on the evaluated split; support-set counts are reported separately because Pegasos active-set points and SVC support vectors arise from different solvers."
     )
 
     doc.add_heading("Research Question and Core Claim", level=1)
     doc.add_paragraph(
-        "Research question: Is quantum-kernel performance governed more by kernel geometry (alignment + spectrum + conditioning) than by feature-map expressivity alone?"
+        "Research question: How are measured quantum-kernel geometry diagnostics (alignment, spectrum, and conditioning) associated with performance in the evaluated fake-news configurations?"
     )
     doc.add_paragraph(
-        "Core claim: Conditioning and spectral structure are strong predictors of stability and generalization. Alignment alone is not sufficient: a kernel can be aligned yet fragile "
-        "when its Gram matrix is poorly conditioned. The best-performing configurations tend to exhibit balanced geometry rather than extreme values of any single diagnostic."
+        "Core claim: In this 25-configuration sweep, measured conditioning and spectral diagnostics show exploratory associations with accuracy. These results do not establish causality or validated prediction; alignment alone does not describe all observed variation."
     )
 
     doc.add_heading("1. Introduction", level=1)
@@ -87,9 +93,9 @@ def write_paper_docx(
         [
             "We provide a geometry-first evaluation of quantum kernels by measuring alignment, spectrum, and conditioning and relating them to accuracy across feature maps, depths, and qubit counts.",
             "We report strong classical baselines on matched representations (PCA-reduced, full standardized features, and a 20+ derived-feature expansion).",
-            "We expose a sparsity advantage: quantum kernels can achieve comparable accuracy with substantially fewer support vectors than a classical RBF SVM.",
-            "We include a second tabular dataset sanity check (breast cancer) to test whether geometry-performance trends persist beyond one dataset.",
-            "We include NISQ-relevant stress tests via depolarizing-noise robustness sweeps in Aer.",
+            "We report support-set sizes for Pegasos quantum kernels and support-vector counts for classical RBF SVMs, while noting that these solver-specific counts are not directly equivalent measures of computational cost.",
+            "We include a breast-cancer classification sanity check; the full geometry analysis is not replicated there.",
+            "We evaluate modeled depolarizing noise in a classical Aer simulator; this is not a hardware experiment.",
         ],
         start=1,
     ):
@@ -97,11 +103,11 @@ def write_paper_docx(
 
     doc.add_heading("1.2 Scope and empirical gap", level=2)
     doc.add_paragraph(
-        "The main empirical gap in the QML literature is not whether a quantum model can match a baseline on a single split; it is whether the mechanism behind that result survives perturbation. We therefore combine seed sweeps, paired significance tests, and multivariate geometry analysis so that claims about sparsity and stability are backed by repeatable evidence rather than a one-off run."
+        "We combine seed sweeps and multivariate geometry analysis to characterize this implementation. Geometry results are exploratory associations across a limited configuration set; any inferential claims are restricted to reproduced statistical analyses."
     )
     doc.add_heading("2. Related Work", level=1)
     doc.add_paragraph(
-        "Quantum kernel methods are usually motivated by richer feature maps, yet recent evidence shows that performance is governed just as much by finite-sample geometry, kernel alignment, and the conditioning of the induced Gram matrix. A map that looks expressive on paper can still be numerically fragile if its spectrum collapses or if the support set shifts under resampling. The relevant question is therefore not only whether the map is expressive, but whether the induced geometry supports stable generalization."
+        "Quantum-kernel performance depends on the induced finite-sample geometry as well as the choice of feature map. Recent work studies exponential concentration and its effect on kernel information under finite-shot estimation (Thanasilp et al., 2024), while empirical analyses caution that generalization behavior may not be explained by model-family measures alone (Gil-Fuster et al., 2024). These findings motivate inspecting alignment, spectrum, and conditioning together without treating any one diagnostic as a causal explanation."
     )
     doc.add_paragraph(
         "In fake-news detection, the strongest systems typically combine text embeddings, hand-crafted engagement features, and graph or propagation signals, and they are evaluated on more than one benchmark because a single dataset can reward accidental correlations. Structured engagement metadata is therefore a useful but incomplete test bed: it is compact enough to make kernel geometry interpretable, yet realistic enough to expose when a model is succeeding because of a favorable split rather than a robust signal."
@@ -110,28 +116,24 @@ def write_paper_docx(
         "This paper sits at the intersection of those two literatures. Rather than proposing a new quantum feature map in isolation, we ask how geometry, conditioning, and sparsity interact with a real classification task. The result is a methodological study rather than a benchmark-chasing demo, with emphasis on the diagnostics that reviewers usually expect in a journal-style QML submission."
     )
     doc.add_paragraph(
-        "A second gap in prior work is the frequent omission of the diagnostics needed to interpret failure. Here we report support-vector counts, seed variability, paired tests, spectral statistics, and a multivariate geometry regression so model behavior can be inspected from several angles rather than inferred from a single metric."
+        "Our contribution is a joint empirical report of established diagnostics for this fake-news metadata task, alongside matched-representation classical baselines. We do not introduce a new geometry metric or claim quantum advantage. Recent work on quantum-kernel generalization, including Local-Global kernels and benign overfitting (Tomasi et al., 2026), further underscores that performance depends on the kernel and task regime."
     )
 
     doc.add_heading("3. Methodology", level=1)
     doc.add_heading("Kernel Diagnostics", level=2)
     doc.add_paragraph(
-        "Alignment measures how well the centered Gram matrix matches the label outer-product structure. Conditioning measures numerical stability; very large values indicate near-singularity in the centered Gram matrix. "
+        "Alignment measures how well the centered Gram matrix matches the label outer-product structure. For spectral statistics, we symmetrize and center the Gram matrix, add a ridge of 10⁻⁸ to its diagonal, and order eigenvalues from largest to smallest. The spectral gap is λ₁ − λ₂. The condition number is the largest positive eigenvalue divided by the smallest positive eigenvalue of this ridge-adjusted matrix. This definition yields values on the 10⁸–10⁹ scale in the current run; the previously reported values around 30–45 were not reproduced and are not used. "
         "We include spectral diagnostics but interpret them conservatively: spectral gap alone is not universally 'good' or 'bad'. Instead, we use it as a proxy for spectrum concentration and pair it with effective rank and leading-eigenvalue dominance."
     )
 
     doc.add_heading("Theory-lite intuition", level=2)
     doc.add_paragraph(
-        "Pegasos updates operate through kernel evaluations against the evolving support set. When the Gram matrix is ill-conditioned, the induced decision function becomes sensitive to small perturbations: "
-        "finite sampling, finite shots, and noise can change effective margins. This is why high alignment does not guarantee reliable generalization. Feature-map depth/entanglement changes the spectrum; "
-        "it can improve conditioning by distributing energy across eigen-directions, or worsen it by collapsing the spectrum."
+        "The spectrum and conditioning describe properties of the estimated Gram matrix. Perturbations from finite sampling, finite shots, or noise may alter those estimates and the resulting classifier. The present experiments measure these associations; they do not isolate a causal effect of conditioning on generalization."
     )
 
     doc.add_heading("4. Experimental Setup", level=1)
     doc.add_paragraph(
-        "Primary dataset: Facebook fact-checking posts represented as structured engagement and metadata features; labels are mapped to binary truthfulness. "
-        "We use a stratified train/test split. For quantum models, features are mapped to angles and encoded via multiple feature maps. "
-        "Auxiliary dataset: scikit-learn breast cancer benchmark (tabular; no external downloads), used as a sanity check for geometry trends."
+        "Primary dataset: 2,016 Facebook fact-checking posts represented by structured engagement and metadata features; labels are mapped to binary truthfulness. We use a stratified 75/25 train/test split with seed 42. Quantum models use PCA followed by angle scaling to [0, π] and Z, ZZ, Pauli-XYZ, or custom RY feature maps. Full-data ideal-kernel experiments use the complete training split; geometry diagnostics use a stratified 400-example training subset. The seed sweep uses ten split seeds. Exact repetitions, qubits, Pegasos settings, shots, noise settings, and software versions are recorded in the run manifest. The scikit-learn breast-cancer data provide a classification check only; the geometry analysis is not replicated there."
     )
 
     doc.add_heading("5. Results", level=1)
@@ -142,28 +144,7 @@ def write_paper_docx(
 
     doc.add_heading("Main findings (quantified)", level=2)
 
-    # Sparsity/support-vector comparison
-    try:
-        svm_support = None
-        if baselines_2d is not None and not baselines_2d.empty and "model" in baselines_2d.columns and "n_support" in baselines_2d.columns:
-            row = baselines_2d[baselines_2d["model"] == "SVM_RBF"].head(1)
-            if not row.empty:
-                svm_support = float(row.iloc[0]["n_support"]) if pd.notna(row.iloc[0]["n_support"]) else None
-
-        q_support = None
-        if quantum_featuremaps is not None and not quantum_featuremaps.empty and "feature_map" in quantum_featuremaps.columns:
-            row = quantum_featuremaps[quantum_featuremaps["feature_map"] == "pauli_xyz"].head(1)
-            if not row.empty and "n_support" in row.columns:
-                q_support = float(row.iloc[0]["n_support"]) if pd.notna(row.iloc[0]["n_support"]) else None
-
-        if svm_support is not None and q_support is not None:
-            ratio = svm_support / max(1.0, q_support)
-            doc.add_paragraph(
-                f"F1 (sparsity): On PCA(2), the classical RBF SVM uses ~{int(svm_support)} support vectors, while the Pauli quantum kernel uses ~{int(q_support)} "
-                f"(≈{ratio:.1f}× fewer). This supports a publishable sparsity claim: comparable accuracy with a significantly sparser solution."
-            )
-    except Exception:
-        pass
+    # The per-seed table below is the authoritative support-count comparison.
 
     doc.add_heading("Statistical validation", level=2)
     try:
@@ -209,8 +190,8 @@ def write_paper_docx(
                     supp_row = significance_df[significance_df["metric"] == "support_vectors"].head(1)
                     if not acc_row.empty and not supp_row.empty:
                         doc.add_paragraph(
-                            "Interpretation: the paired seed sweep supports a stable accuracy comparison and a clear support-vector gap. "
-                            f"Across 10 seeds, the quantum classifier changes accuracy by {float(acc_row.iloc[0]['mean_diff']):+.4f} on average and reduces support vectors by {float(supp_row.iloc[0]['mean_diff']):+.1f} on average relative to the classical RBF SVM."
+                            "Interpretation: the paired accuracy difference is small; its 95% bootstrap confidence interval includes zero. "
+                            f"Across {int(acc_row.iloc[0]['n'])} seeds, the mean quantum-minus-RBF accuracy difference is {float(acc_row.iloc[0]['mean_diff']):+.4f}. Support-set counts are solver-specific and should not be interpreted as a direct measure of total computational cost."
                         )
                 except Exception:
                     pass
@@ -309,8 +290,7 @@ def write_paper_docx(
     try:
         if geometry_correlations is not None and not geometry_correlations.empty:
             doc.add_paragraph(
-                "F2 (diagnostics matter): We correlate geometry metrics with test accuracy across sweeps (feature maps, depth, qubits). "
-                "Stronger magnitude correlations indicate the diagnostic is genuinely explanatory rather than decorative."
+                "Exploratory geometry associations: we correlate measured geometry metrics with test accuracy across the evaluated configurations (n is reported per metric). These correlations are descriptive and do not establish causal effects or out-of-sample predictive value."
             )
             for _, row in geometry_correlations.iterrows():
                 metric = str(row.get("metric"))
@@ -328,8 +308,8 @@ def write_paper_docx(
                     pr_cond = float(row_cond.iloc[0]["pearson_r"])
                     pr_align = float(row_align.iloc[0]["pearson_r"])
                     doc.add_paragraph(
-                        "Interpretation: Accuracy tends to decrease as condition number increases (worse conditioning), and this relationship is stronger than the alignment–accuracy relationship. "
-                        f"In this run, |r(condition)|={abs(pr_cond):.3f} vs r(alignment)={pr_align:.3f}. We interpret conditioning as a strong predictor of stability for Pegasos optimization."
+                        "Interpretation: In this configuration sweep, accuracy is associated with log condition number and alignment. "
+                        f"The observed Pearson coefficients are r(condition)={pr_cond:.3f} and r(alignment)={pr_align:.3f}; with this small exploratory sample, they should not be read as causal effects or validated predictors."
                     )
             except Exception:
                 pass
@@ -346,7 +326,7 @@ def write_paper_docx(
                 p1 = float(nr.iloc[-1]["noise_prob"])
                 a1 = float(nr.iloc[-1]["accuracy"])
                 doc.add_paragraph(
-                    f"F3 (noise): Under depolarizing noise, accuracy changes from {a0:.3f} at p={p0:g} to {a1:.3f} at p={p1:g} (Δ={a1 - a0:+.3f})."
+                    f"Simulator noise sweep: accuracy changes from {a0:.3f} at p={p0:g} to {a1:.3f} at p={p1:g} (Δ={a1 - a0:+.3f}); intermediate values are reported because the observed trend is not monotonic."
                 )
 
                 # If kernel-level stats exist, explicitly report degradation evidence.
@@ -360,41 +340,16 @@ def write_paper_docx(
                         if kn0 is not None and kn1 is not None:
                             extra = f" (k_min: {kn0:.3f} → {kn1:.3f})"
                         doc.add_paragraph(
-                            "Kernel-level evidence: the Gram matrix itself degrades under noise even when decision accuracy stays stable. "
+                            "Kernel-level evidence: mean kernel similarity decreases as modeled noise increases, while test accuracy varies across the sweep. "
                             f"On a fixed training subset, mean similarity drops {km0:.3f} → {km1:.3f}{extra}. "
-                            "We interpret this as decision-level robustness under this training regime (training and testing with the same noisy kernel), not as universal noise immunity of the feature map."
+                            "The noisy Pegasos models use a stratified 60-example training subset and are evaluated on the full held-out split, so this is a limited simulator stress test, not evidence of hardware robustness or universal noise immunity."
                         )
     except Exception:
         pass
 
-    doc.add_heading("5.1 Text benchmark validation", level=2)
+    doc.add_heading("5.1 Auxiliary text benchmark scope", level=2)
     doc.add_paragraph(
-        "To address the single-dataset limitation directly, we include two external text benchmarks already produced by the pipeline: WELFake and LIAR. "
-        "These are not the primary claim of the paper, but they show that the geometry-aware story is not limited to Facebook engagement metadata."
-    )
-    _add_text_benchmark_section(
-        doc,
-        "WELFake",
-        text_welfake_qubit_scaling,
-        text_welfake_noise,
-    )
-    _add_captioned_figure(
-        doc,
-        18,
-        "WELFake accuracy vs qubits",
-        out_path.parent.parent / "new_results" / "welfake" / "figures" / "accuracy_vs_qubits.png",
-    )
-    _add_text_benchmark_section(
-        doc,
-        "LIAR",
-        text_liar_qubit_scaling,
-        text_liar_noise,
-    )
-    _add_captioned_figure(
-        doc,
-        19,
-        "LIAR accuracy vs qubits",
-        out_path.parent.parent / "new_results" / "liar" / "figures" / "accuracy_vs_qubits.png",
+        "WELFake and LIAR exploratory output files were not used as confirmatory results because their result tables contain conflicting runs and incomplete provenance. They are excluded from the claims and tables in this revision; a reproducible, matched evaluation is left for future work."
     )
 
     doc.add_heading("6. Tables", level=1)
@@ -441,12 +396,10 @@ def write_paper_docx(
 
     doc.add_heading("7.1 Figure analysis", level=2)
     doc.add_paragraph(
-        "The scatter plots provide a concrete mechanism-level story: alignment shows only a moderate trend with accuracy, while conditioning shows a much stronger relationship. "
-        "Spectral diagnostics should be interpreted carefully: spectral gap is not universally 'good' or 'bad'. In our sweeps, spectral gap and condition number correlate strongly and negatively with accuracy, while effective-rank and eigen-dominance metrics are weaker complementary indicators rather than sole explanations."
+        "The scatter plots summarize exploratory associations from 25 configurations. The correlation estimates are sensitive to the small sweep and the recorded outlier rule; they do not establish causal mechanisms or validated prediction. Spectral gap, effective rank, and eigen-dominance are descriptive summaries whose interpretation depends on the matrix and regularization used."
     )
     doc.add_paragraph(
-        "The kernel heatmaps and eigenspectra visualize this directly: smoother, structured kernels can still be poorly conditioned; conversely, kernels with more evenly distributed eigenvalues can yield more stable training. "
-        "The noise curve is reported as a degradation profile rather than a single-point comparison, which better reflects NISQ sensitivity; we additionally report kernel-level degradation (mean similarity) to avoid over-interpreting accuracy-only robustness."
+        "The kernel heatmaps and eigenspectra visualize the sampled Gram matrices. The finite-shot noise sweep uses a 60-example stratified training subset and a fixed 30-example kernel-statistics subset; accuracy is evaluated on the held-out split and is non-monotonic across noise levels. These simulator results are descriptive and are not evidence of hardware robustness."
     )
 
     # Kernel heatmaps and spectra (one per feature map)
@@ -456,18 +409,15 @@ def write_paper_docx(
 
     doc.add_heading("8. Discussion and Loopholes", level=1)
     doc.add_paragraph(
-        "We explicitly address common loopholes reviewers flag: (i) diagnostics computed but not validated—here we provide correlation plots and summary correlations; "
-        "(ii) quantum vs classical not benchmarked fairly—here we include classical baselines on matched representations; "
-        "(iii) results not general—here we include a second dataset sanity check; and (iv) claims without mechanistic support—here the kernel matrix spectrum/conditioning directly supports the narrative."
+        "The primary comparison reports classical and quantum models on matched PCA representations, while full-feature classical baselines are shown separately. Auxiliary datasets provide classification checks only. The geometry analysis remains exploratory and is not a causal or cross-dataset validation study."
     )
 
     doc.add_heading("8.1 Implementation notes (for reproducibility)", level=2)
     doc.add_paragraph(
-        "Kernel-target alignment (centered): A(K, yyᵀ) = ⟨Kc, Yc⟩F / (||Kc||F ||Yc||F). "
-        "Spectral gap is defined as λ₁ − λ₂ of the centered Gram matrix (ridge-stabilized). Conditioning is the ratio of the largest to smallest positive eigenvalue."
+        "Kernel-target alignment (centered): A(K, yyᵀ) = ⟨Kc, Yc⟩F / (||Kc||F ||Yc||F). The centered Gram matrix is symmetrized and receives a diagonal ridge of 10⁻⁸ before eigendecomposition. Eigenvalues are sorted descending; gap = λ₁ − λ₂. Condition number = largest positive eigenvalue / smallest positive eigenvalue. Geometry diagnostics use n=400 stratified training examples; the configuration sweep has n=25. The condition-number values around 30–45 from the prior draft were not reproduced under this definition and were removed."
     )
     doc.add_paragraph(
-        "Noise model: depolarizing error applied to 1-qubit and 2-qubit gates in an AerSimulator-backed sampler; we sweep the depolarizing probability p."
+        "Noise model: depolarizing error is applied to 1-qubit and 2-qubit gates in an AerSimulator-backed sampler. The noise sweep uses p ∈ {0, 0.001, 0.005, 0.01, 0.02}, 512 shots, a 60-example stratified training subset, and a full held-out test split."
     )
 
     doc.add_heading("9. Limitations", level=1)
@@ -480,7 +430,7 @@ def write_paper_docx(
         
     doc.add_paragraph(
         "Diagnostics on subsets: alignment/spectrum/conditioning are computed on stratified subsets of the training data to avoid O(n²) costs; this trades precision for tractability. "
-        "To quantify this variance, we evaluated the Pauli-XYZ kernel across multiple subset sizes (k=5 random draws per size):",
+        "We evaluated the Pauli-XYZ kernel across multiple subset sizes (five random draws per size where available); these estimates characterize subset variability but do not establish representativeness of every geometry result:",
         style="List Bullet"
     )
     
@@ -508,29 +458,40 @@ def write_paper_docx(
             _add_table(doc, "Diagnostic Subset Estimation Variance", pd.DataFrame(formatted_rows))
             
             doc.add_paragraph(
-                "As expected, the variance in all diagnostic estimates strictly decreases as the subset size increases towards n=250. "
-                "This confirms that the subset estimates used throughout the paper are stable and sufficiently representative of the true geometry."
+                "The subset-size summary is descriptive. No monotonic reduction in variance or representativeness claim is assumed; the main geometry analysis uses n=400 and should be interpreted as a subset-based estimate."
             )
     except Exception:
         pass
 
     doc.add_heading("10. Conclusion", level=1)
     doc.add_paragraph(
-        "We show that kernel geometry—especially conditioning and spectral structure—provides a practical explanatory lens for quantum kernel classifiers. "
-        "Across feature maps, depth sweeps, and qubit counts, geometry metrics correlate with accuracy and help explain failure modes where alignment alone is misleading. "
-        "A second-dataset sanity check supports generality, and the support-vector sparsity gap provides a concrete, defensible quantum insight beyond accuracy parity."
+        "In the evaluated fake-news metadata setting, the measured geometry diagnostics show exploratory associations with accuracy across 25 configurations. The ten-seed accuracy comparison does not show a reliable difference between the quantum model and the PCA(2) RBF baseline. Support-set ratios are descriptive solver-specific counts, not a demonstrated computational advantage. These experiments do not demonstrate quantum advantage. Auxiliary datasets provide classification checks only; the full geometry protocol was not replicated on them."
     )
 
     doc.add_heading("References", level=1)
     for ref in [
+        "Gil-Fuster, E., Eisert, J., & Bravo-Prieto, C. (2024). Understanding quantum machine learning also requires rethinking generalization. Nature Communications, 15, 2277. https://doi.org/10.1038/s41467-024-45882-z.",
         "Havlicek, V., Cordova, F. A., Mauerer, W., et al. (2019). Supervised learning with quantum-enhanced feature spaces. Nature, 567, 209-212.",
         "Schuld, M., & Killoran, N. (2019). Quantum machine learning in feature Hilbert spaces. Physical Review Letters, 122(4), 040504.",
         "Shalev-Shwartz, S., Singer, Y., Srebro, N., & Cotter, A. (2011). Pegasos: Primal estimated sub-gradient solver for SVM. Mathematical Programming, 127, 3-30.",
         "Shu, K., Sliva, A., Wang, S., Tang, J., & Liu, H. (2017). Fake news detection on social media: A data mining perspective. ACM SIGKDD Explorations, 19(1), 22-36.",
+        "Thanasilp, S., Wang, S., Cerezo, M., & Holmes, Z. (2024). Exponential concentration in quantum kernel methods. Nature Communications, 15, 5200. https://doi.org/10.1038/s41467-024-49287-w.",
+        "Tomasi, J., Anthoine, S., & Kadri, H. (2026). Benign overfitting with quantum kernels. Proceedings of the 42nd Conference on Uncertainty in Artificial Intelligence, PMLR 337, 6740-6766.",
         "Zhou, X., & Zafarani, R. (2020). A survey of fake news: Fundamental theories, detection methods, and opportunities. ACM Computing Surveys, 53(5), 1-40.",
     ]:
         doc.add_paragraph(ref, style="List Bullet")
 
+    # The manuscript is a revised resubmission draft; yellow highlighting marks
+    # revised content throughout because the prior source draft was regenerated.
+    for paragraph in doc.paragraphs:
+        for run in paragraph.runs:
+            run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.highlight_color = WD_COLOR_INDEX.YELLOW
     doc.save(out_path)
 
 
@@ -545,15 +506,35 @@ def _add_table(doc: Document, title: str, df: pd.DataFrame) -> None:
     hdr_cells = table.rows[0].cells
     for j, col in enumerate(df.columns):
         hdr_cells[j].text = str(col)
+        hdr_cells[j].vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        for paragraph in hdr_cells[j].paragraphs:
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in paragraph.runs:
+                run.bold = True
+                run.font.size = Pt(8)
+        shading = OxmlElement("w:shd")
+        shading.set(qn("w:fill"), "D9EAF7")
+        hdr_cells[j]._tc.get_or_add_tcPr().append(shading)
+    repeat = OxmlElement("w:tblHeader")
+    repeat.set(qn("w:val"), "true")
+    table.rows[0]._tr.get_or_add_trPr().append(repeat)
 
     for _, row in df.iterrows():
         cells = table.add_row().cells
         for j, col in enumerate(df.columns):
             val = row[col]
-            if isinstance(val, float):
-                cells[j].text = f"{val:.4f}"
+            if isinstance(val, (float, np.floating)):
+                if np.isfinite(val) and (abs(val) >= 1e5 or (0 < abs(val) < 1e-3)):
+                    cells[j].text = f"{val:.3e}"
+                else:
+                    cells[j].text = f"{val:.4f}" if np.isfinite(val) else "—"
             else:
                 cells[j].text = str(val)
+            cells[j].vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            for paragraph in cells[j].paragraphs:
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in paragraph.runs:
+                    run.font.size = Pt(8)
 
     _set_table_borders(table)
 
