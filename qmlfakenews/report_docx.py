@@ -45,10 +45,6 @@ def write_paper_docx(
     pca_tradeoff: pd.DataFrame,
     noise_robustness: pd.DataFrame,
     pegasos_convergence: pd.DataFrame,
-    text_welfake_qubit_scaling: pd.DataFrame,
-    text_welfake_noise: pd.DataFrame,
-    text_liar_qubit_scaling: pd.DataFrame,
-    text_liar_noise: pd.DataFrame,
 ) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -66,7 +62,7 @@ def write_paper_docx(
         "We examine whether quantum-kernel performance is associated with kernel geometry, including label alignment, spectrum, and numerical conditioning. "
         "We compute geometry diagnostics on Gram-matrix subsets and report exploratory associations with test accuracy across the configurations evaluated. "
         "We benchmark against strong classical baselines on matched representations (PCA(2), full features, and a 20+ feature expansion), sweep the PCA–qubits bottleneck, "
-        "and evaluate modeled depolarizing noise in a classical simulator. On the PCA(2) representation, quantum-kernel accuracy is comparable to the RBF baseline on the evaluated split; support-set counts are reported separately because Pegasos active-set points and SVC support vectors arise from different solvers."
+        "and evaluate modeled depolarizing noise in a classical simulator. On the PCA(2) representation, quantum-kernel accuracy is comparable to the RBF baseline on the evaluated split; solver-specific support-set counts are reported descriptively and are not interpreted as a compression or efficiency comparison."
     )
 
     doc.add_heading("Research Question and Core Claim", level=1)
@@ -85,13 +81,13 @@ def write_paper_docx(
         "This matters for fake-news detection because the task is not merely classification, but classification under a noisy and correlated data-generation process. Engagement metadata is compact, heterogeneous, and prone to spurious structure, so a single accuracy score is not enough to justify a claim. A credible QML study therefore needs matched baselines, seed stability, failure diagnostics, and perturbation tests that probe the geometry directly."
     )
     doc.add_paragraph(
-        "Prior quantum-kernel studies often report a single benchmark result and infer advantage from one number. Here the Gram matrix itself is the object of analysis: if its spectrum is ill-conditioned, the classifier can become unstable even when alignment appears favorable. That framing motivates the compression, conditioning, and noise analyses reported below."
+        "Prior quantum-kernel studies often report a single benchmark result and infer advantage from one number. Here the Gram matrix itself is the object of analysis: if its spectrum is ill-conditioned, the classifier can become unstable even when alignment appears favorable. That framing motivates the support-set, conditioning, and noise analyses reported below."
     )
 
     doc.add_heading("1.1 Contributions", level=2)
     for i, bullet in enumerate(
         [
-            "We provide a geometry-first evaluation of quantum kernels by measuring alignment, spectrum, and conditioning and relating them to accuracy across feature maps, depths, and qubit counts.",
+            "We provide a bounded empirical case study of how established kernel-alignment, spectral, and conditioning diagnostics co-vary with accuracy across 24 distinct quantum-kernel settings for structured Facebook fact-check metadata; the metrics and Pegasos solver are established methods.",
             "We report strong classical baselines on matched representations (PCA-reduced, full standardized features, and a 20+ derived-feature expansion).",
             "We report support-set sizes for Pegasos quantum kernels and support-vector counts for classical RBF SVMs, while noting that these solver-specific counts are not directly equivalent measures of computational cost.",
             "We include a breast-cancer classification sanity check; the full geometry analysis is not replicated there.",
@@ -107,16 +103,25 @@ def write_paper_docx(
     )
     doc.add_heading("2. Related Work", level=1)
     doc.add_paragraph(
-        "Quantum-kernel performance depends on the induced finite-sample geometry as well as the choice of feature map. Recent work studies exponential concentration and its effect on kernel information under finite-shot estimation (Thanasilp et al., 2024), while empirical analyses caution that generalization behavior may not be explained by model-family measures alone (Gil-Fuster et al., 2024). These findings motivate inspecting alignment, spectrum, and conditioning together without treating any one diagnostic as a causal explanation."
+        "Quantum-kernel research has established fidelity feature-space classifiers and studied their finite-sample behavior. Schuld and Killoran (2019) framed quantum machine learning in feature Hilbert spaces, and Havlicek et al. (2019) developed a quantum-enhanced feature-space learning framework. Thanasilp et al. (2024) analyzed conditions under which quantum kernel values concentrate and become difficult to distinguish with finite shots; Gil-Fuster et al. (2024) examined limits of standard model-complexity reasoning for QML generalization; Tomasi et al. (2026) studied benign overfitting with quantum kernels. These works motivate kernel-level and generalization diagnostics, but they are not evidence that any one geometry statistic causes accuracy changes in the present task."
     )
     doc.add_paragraph(
-        "In fake-news detection, the strongest systems typically combine text embeddings, hand-crafted engagement features, and graph or propagation signals, and they are evaluated on more than one benchmark because a single dataset can reward accidental correlations. Structured engagement metadata is therefore a useful but incomplete test bed: it is compact enough to make kernel geometry interpretable, yet realistic enough to expose when a model is succeeding because of a favorable split rather than a robust signal."
+        "Quantum methods have already been applied to fake-news classification. Tian (2023) studied quantum k-nearest neighbors, quantum support-vector machines, and a variational classifier. Khalil et al. (2025) evaluated PegasosQSVM on BuzzFace and TruthSeeker, including PCA-based reduction, Z/ZZ feature maps, and classification/runtime comparisons. We therefore make no first-application claim, and do not claim a new quantum classifier, feature map, or Pegasos method."
     )
     doc.add_paragraph(
-        "This paper sits at the intersection of those two literatures. Rather than proposing a new quantum feature map in isolation, we ask how geometry, conditioning, and sparsity interact with a real classification task. The result is a methodological study rather than a benchmark-chasing demo, with emphasis on the diagnostics that reviewers usually expect in a journal-style QML submission."
+        "The contribution here is narrower and empirical: for the 2,016-row Facebook fact-check metadata analysis defined in this paper, we report centered alignment, spectral summaries, and numerical conditioning alongside accuracy across 24 distinct combinations of established feature maps, PCA dimensions, qubit counts, depths, and Pegasos iterations. We pair that configuration-level analysis with a ten-seed PCA(2) RBF comparison and a finite-shot simulator stress test. This combination documents how the measured Gram-matrix diagnostics behave in this particular low-qubit metadata setting; it does not establish a general law, causal mechanism, cross-dataset result, or quantum advantage."
     )
     doc.add_paragraph(
-        "Our contribution is a joint empirical report of established diagnostics for this fake-news metadata task, alongside matched-representation classical baselines. We do not introduce a new geometry metric or claim quantum advantage. Recent work on quantum-kernel generalization, including Local-Global kernels and benign overfitting (Tomasi et al., 2026), further underscores that performance depends on the kernel and task regime."
+        "The novelty claim is therefore the task-specific diagnostic synthesis and its documented empirical results, not algorithmic novelty. Geometry statistics are exploratory and configuration points share a train/test split, so we present them as dependent descriptive associations. Stronger validation across datasets, balanced qubit sweeps, and device-calibrated hardware remains outside this study."
+    )
+    _add_table(
+        doc,
+        "Position relative to prior work",
+        pd.DataFrame([
+            {"Work": "Tian (2023); Khalil et al. (2025)", "Prior focus": "Fake-news QKNN/QSVM/VQC and PegasosQSVM classification, with selected feature-map and runtime comparisons.", "Distinction here": "No new classifier or accuracy-superiority claim; the focus is Gram geometry across metadata-model settings."},
+            {"Work": "Havlicek et al. (2019); Thanasilp et al. (2024); Gil-Fuster et al. (2024)", "Prior focus": "Quantum feature spaces, kernel concentration, and generalization analysis.", "Distinction here": "Uses established concepts descriptively in one task-specific empirical study; does not extend their theory."},
+            {"Work": "This study", "Prior focus": "24 settings; alignment, spectrum, conditioning; ten-seed matched PCA(2) baseline; modeled finite-shot noise.", "Distinction here": "Bounded diagnostic synthesis only; no new metric, causal claim, cross-dataset validation, or quantum advantage."},
+        ]),
     )
 
     doc.add_heading("3. Methodology", level=1)
@@ -134,6 +139,21 @@ def write_paper_docx(
     doc.add_heading("4. Experimental Setup", level=1)
     doc.add_paragraph(
         "Primary dataset: 2,016 Facebook fact-checking posts represented by structured engagement and metadata features; labels are mapped to binary truthfulness. We use a stratified 75/25 train/test split with seed 42. Quantum models use PCA followed by angle scaling to [0, π] and Z, ZZ, Pauli-XYZ, or custom RY feature maps. Full-data ideal-kernel experiments use the complete training split; geometry diagnostics use a stratified 400-example training subset. The seed sweep uses ten split seeds. Exact repetitions, qubits, Pegasos settings, shots, noise settings, and software versions are recorded in the run manifest. The scikit-learn breast-cancer data provide a classification check only; the geometry analysis is not replicated there."
+    )
+    doc.add_paragraph(
+        "Data processing: we remove Debate, account_id, post_id, and Post URL when present; replace missing share_count values with zero; and drop rows missing reaction_count or comment_count. Rows labeled ‘no factual content’ are excluded. Rating is mapped to +1 for ‘mostly true’ and −1 for ‘mostly false’ or ‘mixture of true and false’. Category, Page, Date Published, and Post Type are converted to integer codes with scikit-learn LabelEncoder before the split. The resulting dataset has 2,016 rows. The split is stratified with test_size=0.25 and random_state=42. PCA and subsequent scalers are fitted on training data only and then applied to the held-out data; PCA uses scikit-learn's default solver settings with random_state=42. For quantum inputs, MinMaxScaler maps each PCA component to [0, π]; classical PCA inputs use StandardScaler. When PCA dimension and qubit count differ in the tradeoff sweep, components are truncated or zero-padded to the circuit input dimension."
+    )
+    doc.add_paragraph(
+        "Quantum implementation: the fidelity kernel is K(x,z)=|⟨φ(x)|φ(z)⟩|². In ideal runs, feature-map states are computed with Qiskit statevectors and overlaps are evaluated exactly. The maps are Qiskit's ZFeatureMap; ZZFeatureMap with linear entanglement; PauliFeatureMap with paulis [X,Y,Z] and full entanglement; and a custom single-layer circuit applying one RY(θᵢ) rotation to each qubit. The repetitions parameter is passed to the three Qiskit maps; the custom RY circuit has one rotation layer. The primary Pauli-XYZ model uses 2 qubits and 2 repetitions. Kernel Pegasos samples one training example uniformly per update using a seeded NumPy generator, adds its coefficient when yᵢf(xᵢ)<1, and predicts with f(x)=[1/(λT)]ΣⱼαⱼyⱼK(xⱼ,x). The main full-preset runs use λ=0.02 and 200 updates; the ten-seed comparison uses 100 updates."
+    )
+    doc.add_paragraph(
+        "Classical models: logistic regression uses max_iter=5,000 and class_weight='balanced'; the random forest uses 500 trees, random_state=42, and class_weight='balanced_subsample'; and the RBF SVC uses C=1, gamma='scale'. Full-feature and engineered-feature baselines are standardized using scalers fitted on the training split. PCA(2) classical baselines use a train-fitted PCA followed by StandardScaler. Five-fold checks use shuffled StratifiedKFold (random_state=42); the full-feature CV pipelines fit the scaler within each fold. The PCA(2) CV check uses PCA prepared on the outer training split before folds, so it is a stability check rather than a fully fold-isolated preprocessing estimate. Precision, recall, and F1 use +1 (‘mostly true’) as the positive class, with zero_division=0."
+    )
+    doc.add_paragraph(
+        "The engineered representation retains engagement counts, adds log1p transforms, count ratios, total engagement and engagement fractions, encodes publication year/month/day-of-week, and one-hot encodes the 20 most frequent Category and Post Type values with remaining values grouped as ‘other’. The separate polynomial baseline uses degree-2 PolynomialFeatures with include_bias=False. These are classical-only representations and are not treated as matched quantum comparisons."
+    )
+    doc.add_paragraph(
+        "Qubit coverage in the geometry sweep: feature-map comparisons (4 settings) and the depth sweep (12 settings) hold the circuit at 2 qubits to compare feature maps and repetitions at a fixed width. A narrower Pauli-XYZ PCA/qubit tradeoff adds 3 settings each at 2, 3, and 4 qubits, spanning PCA dimensions 2, 3, and 4. After removing one repeated setting, the 24 configuration-level points comprise 18 two-qubit, 3 three-qubit, and 3 four-qubit settings. The sweep therefore tests qubits 2–4 but is dominated by the two-qubit fixed-width comparisons; it is not a balanced qubit-scaling study."
     )
 
     doc.add_heading("5. Results", level=1)
@@ -154,7 +174,6 @@ def write_paper_docx(
                 stats_rows = []
                 for label, left, right in [
                     ("accuracy", "q_pauli_accuracy", "svm_rbf_accuracy"),
-                    ("support_vectors", "svm_rbf_n_support", "q_pauli_n_support"),
                 ]:
                     diff = paired[left].astype(float) - paired[right].astype(float)
                     w_stat = p_value = t_stat = t_p_value = None
@@ -187,11 +206,10 @@ def write_paper_docx(
                 _add_table(doc, "Paired significance tests (seed sweep)", significance_df)
                 try:
                     acc_row = significance_df[significance_df["metric"] == "accuracy"].head(1)
-                    supp_row = significance_df[significance_df["metric"] == "support_vectors"].head(1)
-                    if not acc_row.empty and not supp_row.empty:
+                    if not acc_row.empty:
                         doc.add_paragraph(
                             "Interpretation: the paired accuracy difference is small; its 95% bootstrap confidence interval includes zero. "
-                            f"Across {int(acc_row.iloc[0]['n'])} seeds, the mean quantum-minus-RBF accuracy difference is {float(acc_row.iloc[0]['mean_diff']):+.4f}. Support-set counts are solver-specific and should not be interpreted as a direct measure of total computational cost."
+                            f"Across {int(acc_row.iloc[0]['n'])} seeds, the mean quantum-minus-RBF accuracy difference is {float(acc_row.iloc[0]['mean_diff']):+.4f}. Support-set sizes are listed separately as descriptive, solver-specific counts and are not tested as directly comparable outcomes."
                         )
                 except Exception:
                     pass
@@ -263,30 +281,22 @@ def write_paper_docx(
     except Exception:
         pass
 
-    doc.add_heading("Margin Sparsity and Effective Compression", level=2)
+    doc.add_heading("Solver-specific support-set sizes", level=2)
     doc.add_paragraph(
-        "Kernel methods store support vectors and evaluate kernels against them at inference time. Fewer support vectors therefore imply lower memory footprint and faster inference for the same kernel-evaluation budget. "
-        "We report a compression ratio defined as classical support vectors divided by quantum support vectors (higher is better)."
+        "The per-seed table reports two algorithm-specific counts on seed-matched train/test splits. Both pipelines use two PCA components, but the classical RBF SVC receives StandardScaler-scaled PCA features while the quantum Pegasos feature map receives MinMax-scaled angles in [0, π]. The classical SVC uses C=1 and gamma='scale'; its count is the sum of scikit-learn's per-class support-vector counts. Quantum Pegasos uses the Pauli-XYZ map with 2 qubits and 2 repetitions; its count is the number of distinct training examples that entered the active set after a margin-violating update during 100 sampled updates. These counts arise from different optimization procedures on differently scaled inputs and do not measure equivalent representations, memory use, inference work, or model compression. We therefore report raw counts descriptively, omit a count ratio and statistical test, and make no efficiency claim from them."
     )
 
     # Seed sweep summary for statistical stability
     if seed_sweep_summary is not None and not seed_sweep_summary.empty:
-        _add_table(doc, "10-seed stability summary (PCA=2)", seed_sweep_summary)
-        try:
-            row = seed_sweep_summary[seed_sweep_summary["metric"] == "compression_ratio_svm_over_q"].head(1)
-            if not row.empty:
-                m = float(row.iloc[0]["mean"])
-                lo = float(row.iloc[0]["ci95_low"])
-                hi = float(row.iloc[0]["ci95_high"])
-                n = int(row.iloc[0]["n"])
-                doc.add_paragraph(
-                    f"Compression ratio across seeds: mean={m:.2f}× (95% bootstrap CI [{lo:.2f}, {hi:.2f}], n={n})."
-                )
-        except Exception:
-            pass
+        accuracy_summary = seed_sweep_summary[seed_sweep_summary["metric"] == "accuracy_diff_q_minus_svm"]
+        _add_table(doc, "10-seed accuracy comparison (PCA=2)", accuracy_summary)
 
     if seed_sweep is not None and not seed_sweep.empty:
-        _add_table(doc, "Per-seed results (PCA=2)", seed_sweep)
+        display_sweep = seed_sweep.rename(columns={
+            "svm_rbf_n_support": "RBF SVC support vectors",
+            "q_pauli_n_support": "Quantum Pegasos active training points",
+        })
+        _add_table(doc, "Per-seed accuracy and solver-specific support-set sizes (PCA=2)", display_sweep)
 
     # Geometry correlations (diagnostics → evidence)
     try:
@@ -349,9 +359,9 @@ def write_paper_docx(
     except Exception:
         pass
 
-    doc.add_heading("5.1 Auxiliary text benchmark scope", level=2)
+    doc.add_heading("5.1 Cross-dataset scope", level=2)
     doc.add_paragraph(
-        "WELFake and LIAR exploratory output files were not used as confirmatory results because their result tables contain conflicting runs and incomplete provenance. They are excluded from the claims and tables in this revision; a reproducible, matched evaluation is left for future work."
+        "This study does not establish cross-dataset generalization. The breast-cancer experiment below is a classification sanity check only; it does not reproduce the Facebook task, preprocessing, or kernel-geometry protocol. WELFake and LIAR outputs are excluded from the results and claims because their saved tables contain conflicting runs and incomplete provenance. A matched, provenance-complete evaluation across multiple fake-news datasets remains future work."
     )
 
     doc.add_heading("6. Tables", level=1)
@@ -364,8 +374,7 @@ def write_paper_docx(
 
     doc.add_heading("Auxiliary dataset: Breast cancer (sanity check)", level=1)
     doc.add_paragraph(
-        "To ensure our geometry-driven conclusions are not an artifact of a single dataset, we repeat a small subset of the pipeline on the scikit-learn breast cancer benchmark. "
-        "This is a tabular dataset shipped with scikit-learn (no external downloads)."
+        "As a separate classification sanity check, we ran a small subset of the pipeline on the scikit-learn breast-cancer dataset. This check does not test whether the fake-news geometry findings transfer across datasets."
     )
     _add_table(doc, "Breast cancer baselines (full features)", aux_breastcancer_baselines_full)
     _add_table(doc, "Breast cancer baselines (PCA=2)", aux_breastcancer_baselines_pca2)
@@ -414,7 +423,7 @@ def write_paper_docx(
 
     doc.add_heading("8. Discussion and Loopholes", level=1)
     doc.add_paragraph(
-        "The primary comparison reports classical and quantum models on matched PCA representations, while full-feature classical baselines are shown separately. Auxiliary datasets provide classification checks only. The geometry analysis remains exploratory and is not a causal or cross-dataset validation study."
+        "The primary comparison reports classical and quantum models on matched PCA representations, while full-feature classical baselines are shown separately. The breast-cancer results are a classification sanity check only; WELFake and LIAR are excluded because their saved results lack consistent provenance. No cross-dataset generalization or replication of the geometry protocol is claimed."
     )
 
     doc.add_heading("8.1 Implementation notes (for reproducibility)", level=2)
@@ -422,13 +431,13 @@ def write_paper_docx(
         "Kernel-target alignment (centered): A(K, yyᵀ) = ⟨Kc, Yc⟩F / (||Kc||F ||Yc||F). The centered Gram matrix is symmetrized and receives a diagonal ridge of 10⁻⁸ before eigendecomposition. Eigenvalues are sorted descending; gap = λ₁ − λ₂. Condition number = largest positive eigenvalue / smallest positive eigenvalue. Geometry diagnostics use n=400 stratified training examples. The full preset records 25 sweep rows, including one repeated model setting; configuration-level analyses use 24 distinct feature-map, PCA, qubit, depth, and Pegasos-iteration settings. All settings share the same train/test split, so these are dependent configuration points. The prior standard-preset table had 19 rows (4 feature-map, 9 depth-sweep, and 6 PCA/qubit rows). The condition-number values around 30–45 from the prior draft were not reproduced under this definition and were removed."
     )
     doc.add_paragraph(
-        "Noise model: depolarizing error is applied to 1-qubit and 2-qubit gates in an AerSimulator-backed sampler. The noise sweep uses p ∈ {0, 0.001, 0.005, 0.01, 0.02}, 512 shots, a 60-example stratified training subset, and a full held-out test split."
+        "Noise model: finite-shot fidelity estimates use Qiskit's ComputeUncompute with an AerSimulator sampler, 512 shots, and optimization_level=1 transpilation. Depolarizing error p is applied to rx, ry, rz, x, y, z, h, s, sdg, t, and tdg gates; two-qubit depolarizing error min(1,2p) is applied to cx, cz, and swap. The full-preset sweep uses p ∈ {0, 0.001, 0.005, 0.01, 0.02}, 40 Pegasos updates, a fixed stratified 60-example training subset, a fixed 30-example kernel-statistics subset, and the full held-out test split for accuracy. This synthetic channel is not calibrated to a physical device."
     )
 
     doc.add_heading("9. Limitations", level=1)
     for bullet in [
         "Simulator-based evaluation: robustness results depend on shots and the chosen noise model; this is not a substitute for hardware experiments.",
-        "Small qubit counts: sweeps are limited to low qubits/feature dimensions for computational practicality.",
+        "Qubit coverage is narrow and unbalanced: 18 of 24 distinct geometry settings use 2 qubits, with 3 each at 3 and 4 qubits. The higher-qubit checks occur only in the Pauli-XYZ PCA/qubit tradeoff; results do not establish scaling beyond 4 qubits or generalize across a balanced qubit sweep.",
         "Dataset scope: engagement-metadata features are compact; results may differ for high-dimensional text embeddings.",
     ]:
         doc.add_paragraph(bullet, style="List Bullet")
@@ -470,18 +479,20 @@ def write_paper_docx(
 
     doc.add_heading("10. Conclusion", level=1)
     doc.add_paragraph(
-        "In the evaluated fake-news metadata setting, measured geometry diagnostics show exploratory associations with accuracy across 24 distinct model settings. The ten-seed accuracy comparison does not show a reliable difference between the quantum model and the PCA(2) RBF baseline. Support-set ratios are descriptive solver-specific counts, not a demonstrated computational advantage. These experiments do not demonstrate quantum advantage. Auxiliary datasets provide classification checks only; the full geometry protocol was not replicated on them."
+        "This paper contributes a bounded empirical diagnostic study of established quantum-kernel geometry measures on structured Facebook fact-check metadata, building on prior QML fake-news classification work rather than claiming to be the first or to propose a new classifier. Across 24 distinct settings, geometry measures show exploratory associations with accuracy; the ten-seed comparison shows no reliable difference from the PCA(2) RBF baseline. The experiments establish neither causality, cross-dataset generalization, nor quantum advantage. The breast-cancer run is a classification sanity check only, and the full geometry protocol was not replicated on another dataset."
     )
 
     doc.add_heading("References", level=1)
     for ref in [
         "Gil-Fuster, E., Eisert, J., & Bravo-Prieto, C. (2024). Understanding quantum machine learning also requires rethinking generalization. Nature Communications, 15, 2277. https://doi.org/10.1038/s41467-024-45882-z.",
         "Havlicek, V., Cordova, F. A., Mauerer, W., et al. (2019). Supervised learning with quantum-enhanced feature spaces. Nature, 567, 209-212.",
+        "Khalil, M., Zhang, C., Ye, Z., & Zhang, P. (2025). PegasosQSVM: A quantum machine learning approach for accurate fake news detection. Applied Artificial Intelligence, 39(1), e2457207. https://doi.org/10.1080/08839514.2025.2457207.",
         "Schuld, M., & Killoran, N. (2019). Quantum machine learning in feature Hilbert spaces. Physical Review Letters, 122(4), 040504.",
         "Shalev-Shwartz, S., Singer, Y., Srebro, N., & Cotter, A. (2011). Pegasos: Primal estimated sub-gradient solver for SVM. Mathematical Programming, 127, 3-30.",
         "Shu, K., Sliva, A., Wang, S., Tang, J., & Liu, H. (2017). Fake news detection on social media: A data mining perspective. ACM SIGKDD Explorations, 19(1), 22-36.",
         "Thanasilp, S., Wang, S., Cerezo, M., & Holmes, Z. (2024). Exponential concentration in quantum kernel methods. Nature Communications, 15, 5200. https://doi.org/10.1038/s41467-024-49287-w.",
         "Tomasi, J., Anthoine, S., & Kadri, H. (2026). Benign overfitting with quantum kernels. Proceedings of the 42nd Conference on Uncertainty in Artificial Intelligence, PMLR 337, 6740-6766.",
+        "Tian, Z. (2023). Fake News Detection with Quantum Machine Learning [Doctoral dissertation, Auburn University]. Auburn University Electronic Theses and Dissertations. https://etd.auburn.edu/handle/10415/9099.",
         "Zhou, X., & Zafarani, R. (2020). A survey of fake news: Fundamental theories, detection methods, and opportunities. ACM Computing Surveys, 53(5), 1-40.",
     ]:
         doc.add_paragraph(ref, style="List Bullet")
@@ -589,60 +600,3 @@ def _add_captioned_figure(doc: Document, number: int, title: str, path: Path) ->
         doc.add_paragraph(f"(Could not embed figure at: {path})")
 
 
-def _add_text_benchmark_section(doc: Document, dataset_name: str, qdf: pd.DataFrame, ndf: pd.DataFrame) -> None:
-    doc.add_heading(f"{dataset_name} benchmark", level=2)
-    if qdf is None or qdf.empty:
-        doc.add_paragraph("(No external text-benchmark results were found.)")
-        return
-
-    qdf = qdf.copy()
-    if "model" not in qdf.columns:
-        qdf["model"] = "UNKNOWN"
-
-    summary_rows = []
-    for q in sorted(qdf["qubits"].dropna().astype(int).unique().tolist()) if "qubits" in qdf.columns else [None]:
-        rows = qdf[qdf["qubits"] == q] if q is not None else qdf
-        if rows.empty:
-            continue
-        q_row = rows[rows["model"] == "QKernel_Pauli_Pegasos"].head(1)
-        classical_rows = rows[rows["model"] != "QKernel_Pauli_Pegasos"]
-        best_classical = classical_rows["accuracy"].max() if not classical_rows.empty else np.nan
-        best_model = classical_rows.sort_values("accuracy", ascending=False).head(1)["model"].iloc[0] if not classical_rows.empty else "UNKNOWN"
-        summary_rows.append({
-            "qubits": int(q) if q is not None else np.nan,
-            "quantum_accuracy": float(q_row.iloc[0]["accuracy"]) if not q_row.empty and pd.notna(q_row.iloc[0]["accuracy"]) else np.nan,
-            "best_classical_accuracy": float(best_classical) if pd.notna(best_classical) else np.nan,
-            "best_classical_model": best_model,
-            "accuracy_delta": float(q_row.iloc[0]["accuracy"] - best_classical) if not q_row.empty and pd.notna(best_classical) and pd.notna(q_row.iloc[0]["accuracy"]) else np.nan,
-            "n_support": float(q_row.iloc[0]["n_support"]) if not q_row.empty and "n_support" in q_row.columns and pd.notna(q_row.iloc[0]["n_support"]) else np.nan,
-        })
-
-    if summary_rows:
-        _add_table(doc, f"{dataset_name} qubit scaling summary", pd.DataFrame(summary_rows))
-
-    if ndf is not None and not ndf.empty:
-        _add_table(doc, f"{dataset_name} noise robustness", ndf)
-
-    try:
-        if summary_rows:
-            latest = summary_rows[-1]
-            delta = latest.get("accuracy_delta")
-            n_support = latest.get("n_support")
-            if pd.notna(delta):
-                doc.add_paragraph(
-                    f"At the largest qubit setting, the quantum model is {abs(float(delta)):.3f} accuracy points {'below' if float(delta) < 0 else 'above'} the best classical baseline on {dataset_name}."
-                )
-            if pd.notna(n_support):
-                doc.add_paragraph(
-                    f"The sparse solution uses about {int(n_support)} support vectors at this setting, which is the main efficiency signal carried into the abstract and discussion."
-                )
-            if dataset_name.upper() == "WELFAKE":
-                doc.add_paragraph(
-                    "Geometry-wise, WELFake behaves consistently with the main paper: the better-performing qubit settings are the ones where the kernel remains better conditioned, and the accuracy gains line up more clearly with the spectrum/conditioning profile than with expressivity alone. That is the same mechanism observed on the Facebook metadata benchmark."
-                )
-            if dataset_name.upper() == "LIAR":
-                doc.add_paragraph(
-                    "The LIAR accuracy is lower because the benchmark is intrinsically harder after binarization: it starts as a six-class fact-checking corpus, and compressing those labels into a binary target reduces separability and weakens the signal available to any kernel classifier."
-                )
-    except Exception:
-        pass

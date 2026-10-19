@@ -55,6 +55,11 @@ class KernelPegasosSVM:
 
     @property
     def n_support_vectors(self) -> int:
+        """Return distinct training examples ever added to the active set.
+
+        This is a Pegasos-specific active-set count; it is not a solver-neutral
+        analogue of an SVC dual support-vector count.
+        """
         return len(self.support_x)
 
     def fit(

@@ -14,14 +14,6 @@ repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from qmlfakenews.experiments import run_all
-from qmlfakenews.plotting import (
-    save_accuracy_vs_qubits_plot,
-    save_convergence_plot,
-    save_geometry_scatter_plots,
-    save_noise_plot,
-    save_tradeoff_plot,
-)
 from qmlfakenews.report_docx import write_paper_docx
 
 
@@ -67,6 +59,8 @@ def main() -> None:
         else:
             summary = {}
     else:
+        from qmlfakenews.experiments import run_all
+
         preset = "full" if args.full else "standard"
         summary = run_all(
             data_csv=data_csv,
@@ -87,6 +81,38 @@ def main() -> None:
             "dataset_samples": summary.get("n_samples"),
             "random_seed_main": 42,
             "split": {"test_size": 0.25, "stratified": True},
+            "preprocessing": {
+                "drop_columns": ["Debate", "account_id", "post_id", "Post URL"],
+                "missing_values": {"share_count": "fill with 0", "reaction_count": "drop row", "comment_count": "drop row"},
+                "excluded_rating": "no factual content",
+                "label_mapping": {"mostly true": 1, "mostly false": -1, "mixture of true and false": -1},
+                "categorical_columns": ["Category", "Page", "Date Published", "Post Type"],
+                "categorical_encoding": "scikit-learn LabelEncoder applied before the train/test split",
+                "pca": "scikit-learn PCA; fit on training split, transform held-out split; random_state=42",
+                "quantum_scaling": "MinMaxScaler(feature_range=(0, pi)) fitted after PCA on training split",
+                "classical_pca_scaling": "StandardScaler fitted after PCA on training split",
+                "qubit_dimension_mismatch": "truncate excess PCA components or zero-pad missing components",
+                "engineered_classical_features": "engagement counts; log1p counts and totals; safe count ratios and engagement fractions; publication year/month/day-of-week; top-20 Category and Post Type one-hot indicators with other category",
+                "polynomial_classical_features": "degree-2 PolynomialFeatures with include_bias=False",
+            },
+            "classical_baselines": {
+                "logistic_regression": {"max_iter": 5000, "class_weight": "balanced"},
+                "random_forest": {"n_estimators": 500, "random_state": 42, "class_weight": "balanced_subsample"},
+                "rbf_svc": {"kernel": "rbf", "C": 1.0, "gamma": "scale"},
+                "metrics_positive_label": 1,
+                "five_fold_cv": "StratifiedKFold(shuffle=True, random_state=42); PCA(2) is fitted before folds, while full-feature scaler is fit within fold pipelines",
+            },
+            "quantum_implementation": {
+                "kernel": "squared state fidelity |<phi(x)|phi(z)>|^2",
+                "ideal_backend": "exact Qiskit statevector simulation with cached feature states",
+                "feature_maps": {
+                    "z": "Qiskit ZFeatureMap",
+                    "zz": "Qiskit ZZFeatureMap; linear entanglement",
+                    "pauli_xyz": "Qiskit PauliFeatureMap; paulis X,Y,Z; full entanglement",
+                    "ry_custom": "one-layer circuit with one RY(theta_i) per qubit; reps does not alter this circuit",
+                },
+                "pegasos": {"lambda": 0.02, "main_updates": 200 if args.full else (60 if args.quick else 90), "sampling": "one uniform training example per update; seeded NumPy generator; update on margin < 1"},
+            },
             "preset": preset,
             "quick": bool(args.quick),
             "pca_components": [2, 3, 4] if args.full else ([2] if args.quick else [2, 3, 4]),
@@ -100,6 +126,24 @@ def main() -> None:
                 "rows": len(pd.read_csv(outputs_dir / "tables" / "kernel_geometry_performance.csv")),
                 "distinct_model_settings": int(pd.read_csv(outputs_dir / "tables" / "kernel_geometry_performance.csv")["correlation_included"].sum()),
                 "deduplication_fields": ["feature_map", "reps", "pca_components", "qubits", "pegasos_iterations"],
+                "distinct_settings_by_qubits": {str(int(q)): int(n) for q, n in pd.read_csv(outputs_dir / "tables" / "kernel_geometry_performance.csv").query("correlation_included == True").groupby("qubits").size().items()},
+                "design": "Feature-map and depth sweeps fix qubits=2; Pauli-XYZ PCA/qubit tradeoff spans 2, 3, and 4 qubits at PCA dimensions 2, 3, and 4.",
+            },
+            "cross_dataset_scope": {
+                "generalization_established": False,
+                "breast_cancer": "classification sanity check only; fake-news geometry protocol not replicated",
+                "welfake_liar": "excluded from claims and manuscript tables due to conflicting runs and incomplete provenance",
+            },
+            "seed_sweep_support_counts": {
+                "seeds": list(range(10)),
+                "split": "stratified 75/25; paired by seed",
+                "pca_components": 2,
+                "classical_model": "RBF SVC, C=1.0, gamma=scale, on StandardScaler-transformed PCA features",
+                "classical_count": "sum of scikit-learn SVC n_support_ across classes",
+                "quantum_model": "Pauli-XYZ quantum kernel, 2 qubits, 2 repetitions, Pegasos lambda=0.02, 100 sampled updates",
+                "quantum_input_scaling": "MinMaxScaler to [0, pi] after PCA",
+                "quantum_count": "distinct training examples added to Pegasos active set after a margin-violating update",
+                "count_comparison": "descriptive solver-specific counts only; no ratio, significance test, or efficiency claim",
             },
             "condition_number": "largest positive eigenvalue / smallest positive eigenvalue after centering and diagonal ridge 1e-8",
             "spectral_gap": "largest eigenvalue - second-largest eigenvalue after centering and diagonal ridge 1e-8",
@@ -111,6 +155,11 @@ def main() -> None:
                 "kernel_statistics_subset_n": 30,
                 "test_split": "full held-out test split",
                 "simulator": "AerSimulator with depolarizing gate errors",
+                "method": "Qiskit ComputeUncompute with BackendSamplerV2",
+                "one_qubit_error": "depolarizing_error(p, 1) on rx, ry, rz, x, y, z, h, s, sdg, t, tdg",
+                "two_qubit_error": "depolarizing_error(min(1, 2*p), 2) on cx, cz, swap",
+                "transpiler_optimization_level": 1,
+                "hardware_calibrated": False,
             },
             "software": {
                 "python": platform.python_version(),
@@ -143,22 +192,26 @@ def main() -> None:
     pca_tradeoff = _safe_read_csv(outputs_dir / "tables" / "pca_qubits_tradeoff.csv")
     noise_robustness = _safe_read_csv(outputs_dir / "tables" / "noise_robustness.csv")
     pegasos_convergence = _safe_read_csv(outputs_dir / "tables" / "pegasos_convergence.csv")
-    text_welfake_qubit_scaling = _safe_read_csv(repo_root / "outputs" / "new_results" / "welfake" / "tables" / "qubit_scaling.csv")
-    text_welfake_noise = _safe_read_csv(repo_root / "outputs" / "new_results" / "welfake" / "tables" / "noise_sweep.csv")
-    text_liar_qubit_scaling = _safe_read_csv(repo_root / "outputs" / "new_results" / "liar" / "tables" / "qubit_scaling.csv")
-    text_liar_noise = _safe_read_csv(repo_root / "outputs" / "new_results" / "liar" / "tables" / "noise_sweep.csv")
 
-    fig_dir = outputs_dir / "figures"
-    # Plots
-    if not pegasos_convergence.empty:
-        save_convergence_plot(pegasos_convergence, fig_dir / "pegasos_convergence.png")
-    if not pca_tradeoff.empty:
-        save_tradeoff_plot(pca_tradeoff, fig_dir / "pca_tradeoff.png")
-        save_accuracy_vs_qubits_plot(pca_tradeoff, fig_dir / "accuracy_vs_qubits.png")
-    if not noise_robustness.empty:
-        save_noise_plot(noise_robustness, fig_dir / "noise_robustness.png")
-    if not geometry_perf.empty:
-        save_geometry_scatter_plots(geometry_perf, fig_dir)
+    if not args.doc_only:
+        from qmlfakenews.plotting import (
+            save_accuracy_vs_qubits_plot,
+            save_convergence_plot,
+            save_geometry_scatter_plots,
+            save_noise_plot,
+            save_tradeoff_plot,
+        )
+
+        fig_dir = outputs_dir / "figures"
+        if not pegasos_convergence.empty:
+            save_convergence_plot(pegasos_convergence, fig_dir / "pegasos_convergence.png")
+        if not pca_tradeoff.empty:
+            save_tradeoff_plot(pca_tradeoff, fig_dir / "pca_tradeoff.png")
+            save_accuracy_vs_qubits_plot(pca_tradeoff, fig_dir / "accuracy_vs_qubits.png")
+        if not noise_robustness.empty:
+            save_noise_plot(noise_robustness, fig_dir / "noise_robustness.png")
+        if not geometry_perf.empty:
+            save_geometry_scatter_plots(geometry_perf, fig_dir)
 
     headline_results = {
         "Samples": summary.get("n_samples"),
@@ -191,10 +244,6 @@ def main() -> None:
         pca_tradeoff=pca_tradeoff,
         noise_robustness=noise_robustness,
         pegasos_convergence=pegasos_convergence,
-        text_welfake_qubit_scaling=text_welfake_qubit_scaling,
-        text_welfake_noise=text_welfake_noise,
-        text_liar_qubit_scaling=text_liar_qubit_scaling,
-        text_liar_noise=text_liar_noise,
     )
 
     (outputs_dir / "summary.json").write_text(json.dumps(summary, indent=2))

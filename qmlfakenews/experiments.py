@@ -534,7 +534,6 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
                         "svm_rbf_n_support": svm_ns,
                         "q_pauli_accuracy": q_acc,
                         "q_pauli_n_support": q_ns,
-                        "compression_ratio_svm_over_q": (svm_ns / max(1.0, q_ns)) if np.isfinite(svm_ns) and np.isfinite(q_ns) else float("nan"),
                     }
                 )
             except Exception as exc:
@@ -543,7 +542,8 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
         seed_df = pd.DataFrame(seed_rows)
         seed_df.to_csv(outputs_dir / "tables" / "seed_sweep_pca2.csv", index=False)
 
-        # Summary stats + simple bootstrap CI for mean differences/ratios (no SciPy dependency)
+        # Summarize paired accuracy differences only. Support-set counts come
+        # from different solvers and are retained as descriptive per-seed data.
         def _bootstrap_ci(values: np.ndarray, *, n_boot: int = 2000, alpha: float = 0.05, rng_seed: int = 123) -> tuple[float, float]:
             rng = np.random.default_rng(rng_seed)
             values = values[np.isfinite(values)]
@@ -558,34 +558,22 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
             return (lo, hi)
 
         use = seed_df.replace([np.inf, -np.inf], np.nan)
-        use = use.dropna(subset=["svm_rbf_accuracy", "q_pauli_accuracy", "svm_rbf_n_support", "q_pauli_n_support", "compression_ratio_svm_over_q"])
+        use = use.dropna(subset=["svm_rbf_accuracy", "q_pauli_accuracy"])
         if not use.empty:
             diff_acc = (use["q_pauli_accuracy"].to_numpy(dtype=float) - use["svm_rbf_accuracy"].to_numpy(dtype=float))
-            ratio = use["compression_ratio_svm_over_q"].to_numpy(dtype=float)
             lo_d, hi_d = _bootstrap_ci(diff_acc)
-            lo_r, hi_r = _bootstrap_ci(ratio)
-            summary_rows = [
-                {
-                    "metric": "accuracy_diff_q_minus_svm",
-                    "mean": float(np.mean(diff_acc)),
-                    "std": float(np.std(diff_acc, ddof=1)) if diff_acc.size > 1 else 0.0,
-                    "ci95_low": lo_d,
-                    "ci95_high": hi_d,
-                    "n": int(diff_acc.size),
-                },
-                {
-                    "metric": "compression_ratio_svm_over_q",
-                    "mean": float(np.mean(ratio)),
-                    "std": float(np.std(ratio, ddof=1)) if ratio.size > 1 else 0.0,
-                    "ci95_low": lo_r,
-                    "ci95_high": hi_r,
-                    "n": int(ratio.size),
-                },
-            ]
+            summary_rows = [{
+                "metric": "accuracy_diff_q_minus_svm",
+                "mean": float(np.mean(diff_acc)),
+                "std": float(np.std(diff_acc, ddof=1)) if diff_acc.size > 1 else 0.0,
+                "ci95_low": lo_d,
+                "ci95_high": hi_d,
+                "n": int(diff_acc.size),
+            }]
             pd.DataFrame(summary_rows).to_csv(outputs_dir / "tables" / "seed_sweep_summary.csv", index=False)
 
-    # Auxiliary dataset (Option A): small, built-in tabular benchmark to test generality
-    # without requiring downloads. Keep this lightweight.
+    # Auxiliary dataset: a classification sanity check only. This experiment
+    # does not replicate the fake-news task or its geometry protocol.
     if not quick:
         log("Running auxiliary dataset (breast cancer) sanity check...")
         try:
