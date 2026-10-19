@@ -74,7 +74,7 @@ def write_paper_docx(
         "Research question: How are measured quantum-kernel geometry diagnostics (alignment, spectrum, and conditioning) associated with performance in the evaluated fake-news configurations?"
     )
     doc.add_paragraph(
-        "Core claim: In this 25-configuration sweep, measured conditioning and spectral diagnostics show exploratory associations with accuracy. These results do not establish causality or validated prediction; alignment alone does not describe all observed variation."
+        "Core claim: In this exploratory sweep of distinct model settings, measured conditioning and spectral diagnostics show associations with accuracy. These results do not establish causality or validated prediction; alignment alone does not describe all observed variation."
     )
 
     doc.add_heading("1. Introduction", level=1)
@@ -202,6 +202,8 @@ def write_paper_docx(
     try:
         if geometry_performance is not None and not geometry_performance.empty and {"accuracy", "kernel_alignment", "spectral_gap", "condition_number"}.issubset(geometry_performance.columns):
             reg_df = geometry_performance.copy()
+            if "correlation_included" in reg_df.columns:
+                reg_df = reg_df[reg_df["correlation_included"].astype(bool)]
             reg_df["log10_condition_number"] = np.log10(pd.to_numeric(reg_df["condition_number"], errors="coerce"))
             reg_df = reg_df.replace([float("inf"), float("-inf")], pd.NA)
             reg_df = reg_df.dropna(subset=["accuracy", "kernel_alignment", "spectral_gap", "log10_condition_number"])
@@ -290,7 +292,7 @@ def write_paper_docx(
     try:
         if geometry_correlations is not None and not geometry_correlations.empty:
             doc.add_paragraph(
-                "Exploratory geometry associations: we correlate measured geometry metrics with test accuracy across the evaluated configurations (n is reported per metric). These correlations are descriptive and do not establish causal effects or out-of-sample predictive value."
+                "Exploratory geometry associations: we correlate measured geometry metrics with test accuracy across 24 distinct model settings (n is reported per metric). All settings share the same train/test split, so the configuration points are dependent; these correlations are descriptive and do not establish causal effects or out-of-sample predictive value."
             )
             for _, row in geometry_correlations.iterrows():
                 metric = str(row.get("metric"))
@@ -372,7 +374,10 @@ def write_paper_docx(
     _add_table(doc, "Quantum feature map comparison (Pegasos + 2D PCA)", quantum_featuremaps)
 
     _add_table(doc, "Quantum kernel diagnostics", kernel_diagnostics)
-    _add_table(doc, "Kernel geometry ↔ performance dataset", geometry_performance)
+    geometry_table = geometry_performance
+    if geometry_table is not None and "correlation_included" in geometry_table.columns:
+        geometry_table = geometry_table[geometry_table["correlation_included"].astype(bool)].drop(columns=["correlation_included"])
+    _add_table(doc, "Kernel geometry ↔ performance dataset", geometry_table)
     _add_table(doc, "Kernel geometry ↔ accuracy correlations", geometry_correlations)
     _add_table(doc, "PCA/qubits tradeoff sweep", pca_tradeoff)
     _add_table(doc, "Noise robustness sweep", noise_robustness)
@@ -396,7 +401,7 @@ def write_paper_docx(
 
     doc.add_heading("7.1 Figure analysis", level=2)
     doc.add_paragraph(
-        "The scatter plots summarize exploratory associations from 25 configurations. The correlation estimates are sensitive to the small sweep and the recorded outlier rule; they do not establish causal mechanisms or validated prediction. Spectral gap, effective rank, and eigen-dominance are descriptive summaries whose interpretation depends on the matrix and regularization used."
+        "The scatter plots summarize exploratory associations across distinct model settings evaluated on one shared split. Exact duplicate settings are excluded from configuration-level correlations; the estimates remain sensitive to the small sweep and the recorded outlier rule and do not establish causal mechanisms or validated prediction. Spectral gap, effective rank, and eigen-dominance are descriptive summaries whose interpretation depends on the matrix and regularization used."
     )
     doc.add_paragraph(
         "The kernel heatmaps and eigenspectra visualize the sampled Gram matrices. The finite-shot noise sweep uses a 60-example stratified training subset and a fixed 30-example kernel-statistics subset; accuracy is evaluated on the held-out split and is non-monotonic across noise levels. These simulator results are descriptive and are not evidence of hardware robustness."
@@ -414,7 +419,7 @@ def write_paper_docx(
 
     doc.add_heading("8.1 Implementation notes (for reproducibility)", level=2)
     doc.add_paragraph(
-        "Kernel-target alignment (centered): A(K, yyᵀ) = ⟨Kc, Yc⟩F / (||Kc||F ||Yc||F). The centered Gram matrix is symmetrized and receives a diagonal ridge of 10⁻⁸ before eigendecomposition. Eigenvalues are sorted descending; gap = λ₁ − λ₂. Condition number = largest positive eigenvalue / smallest positive eigenvalue. Geometry diagnostics use n=400 stratified training examples; the configuration sweep has n=25. The condition-number values around 30–45 from the prior draft were not reproduced under this definition and were removed."
+        "Kernel-target alignment (centered): A(K, yyᵀ) = ⟨Kc, Yc⟩F / (||Kc||F ||Yc||F). The centered Gram matrix is symmetrized and receives a diagonal ridge of 10⁻⁸ before eigendecomposition. Eigenvalues are sorted descending; gap = λ₁ − λ₂. Condition number = largest positive eigenvalue / smallest positive eigenvalue. Geometry diagnostics use n=400 stratified training examples. The full preset records 25 sweep rows, including one repeated model setting; configuration-level analyses use 24 distinct feature-map, PCA, qubit, depth, and Pegasos-iteration settings. All settings share the same train/test split, so these are dependent configuration points. The prior standard-preset table had 19 rows (4 feature-map, 9 depth-sweep, and 6 PCA/qubit rows). The condition-number values around 30–45 from the prior draft were not reproduced under this definition and were removed."
     )
     doc.add_paragraph(
         "Noise model: depolarizing error is applied to 1-qubit and 2-qubit gates in an AerSimulator-backed sampler. The noise sweep uses p ∈ {0, 0.001, 0.005, 0.01, 0.02}, 512 shots, a 60-example stratified training subset, and a full held-out test split."
@@ -465,7 +470,7 @@ def write_paper_docx(
 
     doc.add_heading("10. Conclusion", level=1)
     doc.add_paragraph(
-        "In the evaluated fake-news metadata setting, the measured geometry diagnostics show exploratory associations with accuracy across 25 configurations. The ten-seed accuracy comparison does not show a reliable difference between the quantum model and the PCA(2) RBF baseline. Support-set ratios are descriptive solver-specific counts, not a demonstrated computational advantage. These experiments do not demonstrate quantum advantage. Auxiliary datasets provide classification checks only; the full geometry protocol was not replicated on them."
+        "In the evaluated fake-news metadata setting, measured geometry diagnostics show exploratory associations with accuracy across 24 distinct model settings. The ten-seed accuracy comparison does not show a reliable difference between the quantum model and the PCA(2) RBF baseline. Support-set ratios are descriptive solver-specific counts, not a demonstrated computational advantage. These experiments do not demonstrate quantum advantage. Auxiliary datasets provide classification checks only; the full geometry protocol was not replicated on them."
     )
 
     doc.add_heading("References", level=1)

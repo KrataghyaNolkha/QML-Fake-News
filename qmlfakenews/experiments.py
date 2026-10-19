@@ -216,6 +216,7 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
                     "reps": 2,
                     "pca_components": 2,
                     "qubits": 2,
+                    "pegasos_iterations": int(iters_main),
                     "accuracy": test_acc,
                     "n_support": float(pegasos.n_support_vectors),
                     "kernel_alignment": align,
@@ -292,6 +293,7 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
                         "reps": int(reps),
                         "pca_components": 2,
                         "qubits": 2,
+                        "pegasos_iterations": int(max(60, iters_main // 2)),
                         "accuracy": test_acc,
                         "n_support": float(pegasos.n_support_vectors),
                         "kernel_alignment": align,
@@ -312,6 +314,7 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
                         "reps": int(reps),
                         "pca_components": 2,
                         "qubits": 2,
+                        "pegasos_iterations": int(max(60, iters_main // 2)),
                         "accuracy": np.nan,
                         "n_support": np.nan,
                         "kernel_alignment": np.nan,
@@ -383,6 +386,7 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
                         "reps": 2,
                         "pca_components": pca_components,
                         "qubits": int(qubits),
+                        "pegasos_iterations": int(iters_main),
                         "accuracy": acc,
                         "n_support": float(pegasos.n_support_vectors),
                         "kernel_alignment": align,
@@ -412,10 +416,22 @@ def run_all(*, data_csv: Path, outputs_dir: Path, seed: int, quick: bool, preset
 
     # Geometry ↔ performance dataset + simple correlation summary
     geometry_df = pd.DataFrame(geometry_rows)
+    # The Pauli PCA=2 / qubits=2 / reps=2 / full-iteration point is emitted by
+    # both the feature-map and PCA/qubit sweeps. Preserve both source rows for
+    # traceability, but flag and exclude exact repeated model settings from
+    # configuration-level correlations.
+    config_columns = [
+        "feature_map",
+        "reps",
+        "pca_components",
+        "qubits",
+        "pegasos_iterations",
+    ]
+    geometry_df["correlation_included"] = ~geometry_df.duplicated(config_columns, keep="first")
     geometry_df.to_csv(outputs_dir / "tables" / "kernel_geometry_performance.csv", index=False)
 
     corr_rows: list[dict] = []
-    g_use = geometry_df.replace([np.inf, -np.inf], np.nan).dropna(
+    g_use = geometry_df[geometry_df["correlation_included"]].replace([np.inf, -np.inf], np.nan).dropna(
         subset=[
             "accuracy",
             "kernel_alignment",

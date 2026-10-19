@@ -10,6 +10,8 @@ repo_root = Path(__file__).resolve().parents[1]
 csv_path = repo_root / 'outputs' / 'tables' / 'kernel_geometry_performance.csv'
 print(f"Reading data from: {csv_path}")
 df = pd.read_csv(csv_path)
+if 'correlation_included' in df.columns:
+    df = df[df['correlation_included'].astype(bool)].copy()
 
 # 2. Replicate Regression Processing
 df_reg = df.copy()

@@ -1,0 +1,73 @@
+{
+  "dataset_path": "E:\\QML-Fake-Newws\\QML-Fake_News_Paper\\data\\facebook-fact-check.csv",
+  "dataset_samples": 2016,
+  "random_seed_main": 42,
+  "split": {
+    "test_size": 0.25,
+    "stratified": true
+  },
+  "preset": "full",
+  "quick": false,
+  "pca_components": [
+    2,
+    3,
+    4
+  ],
+  "qubits": [
+    2,
+    3,
+    4
+  ],
+  "feature_maps": [
+    "z",
+    "zz",
+    "pauli_xyz",
+    "ry_custom"
+  ],
+  "repetitions": [
+    1,
+    2,
+    4,
+    6
+  ],
+  "pegasos_iterations_main": 200,
+  "pegasos_lambda": 0.02,
+  "geometry_subset_n": 400,
+  "condition_number": "largest positive eigenvalue / smallest positive eigenvalue after centering and diagonal ridge 1e-8",
+  "spectral_gap": "largest eigenvalue - second-largest eigenvalue after centering and diagonal ridge 1e-8",
+  "noise": {
+    "probabilities": [
+      0.0,
+      0.001,
+      0.005,
+      0.01,
+      0.02
+    ],
+    "shots": 512,
+    "pegasos_iterations": 40,
+    "stratified_training_subset_n": 60,
+    "kernel_statistics_subset_n": 30,
+    "test_split": "full held-out test split",
+    "simulator": "AerSimulator with depolarizing gate errors"
+  },
+  "software": {
+    "python": "3.12.2",
+    "numpy": "2.3.3",
+    "pandas": "2.3.3",
+    "scikit_learn": "1.7.2",
+    "qiskit": "1.4.5",
+    "qiskit_machine_learning": "0.8.4",
+    "qiskit_aer": "0.17.2"
+  },
+  "geometry_sweep": {
+    "rows": 25,
+    "distinct_model_settings": 24,
+    "deduplication_fields": [
+      "feature_map",
+      "reps",
+      "pca_components",
+      "qubits",
+      "pegasos_iterations"
+    ]
+  }
+}

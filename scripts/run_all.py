@@ -96,6 +96,11 @@ def main() -> None:
             "pegasos_iterations_main": 200 if args.full else (60 if args.quick else 90),
             "pegasos_lambda": 0.02,
             "geometry_subset_n": 400 if args.full else (200 if args.quick else 250),
+            "geometry_sweep": {
+                "rows": len(pd.read_csv(outputs_dir / "tables" / "kernel_geometry_performance.csv")),
+                "distinct_model_settings": int(pd.read_csv(outputs_dir / "tables" / "kernel_geometry_performance.csv")["correlation_included"].sum()),
+                "deduplication_fields": ["feature_map", "reps", "pca_components", "qubits", "pegasos_iterations"],
+            },
             "condition_number": "largest positive eigenvalue / smallest positive eigenvalue after centering and diagonal ridge 1e-8",
             "spectral_gap": "largest eigenvalue - second-largest eigenvalue after centering and diagonal ridge 1e-8",
             "noise": {

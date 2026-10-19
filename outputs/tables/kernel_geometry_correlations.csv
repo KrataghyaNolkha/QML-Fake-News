@@ -1,7 +1,3 @@
-metric,target,pearson_r,spearman_r,n
-kernel_alignment,accuracy,0.4916111527587411,0.3886865884857847,19
-log10_condition_number,accuracy,-0.7428877098641787,-0.5159556484324576,19
-spectral_gap,accuracy,-0.806835302928985,-0.5836031667824908,19
-effective_rank,accuracy,0.1943346414542934,0.17657148857466323,19
-leading_eigen_ratio,accuracy,-0.24390120930623185,-0.2201410766645152,19
-log10_condition_number (no outliers),accuracy,-0.7226089614882435,-0.2843034215207146,17
+version https://git-lfs.github.com/spec/v1
+oid sha256:3499c129642d8a2b54fbc04d20f41b4edb9a836983c650aa7f9468d9ae1d53b8
+size 1358
