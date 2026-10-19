@@ -1,75 +1,75 @@
+from __future__ import annotations
+
 import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import StratifiedShuffleSplit
 
-# Allow running as: python scripts/generate_variance.py
+
 repo_root = Path(__file__).resolve().parents[1]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from qmlfakenews.quantum_kernel import QuantumKernelFactory
+from qmlfakenews.data import load_facebook_factcheck_csv, make_train_test_split, preprocess_facebook_factcheck
 from qmlfakenews.diagnostics import kernel_target_alignment, spectrum_stats
+from qmlfakenews.preprocess import fit_transform_pca, pad_or_trim_features
+from qmlfakenews.quantum_kernel import QuantumKernelFactory
 
-def main():
-    print("Loading data...")
-    data_dir = repo_root / "data"
+
+def main() -> None:
+    data_csv = repo_root / "data" / "facebook-fact-check.csv"
     outputs_dir = repo_root / "outputs"
-    outputs_dir.mkdir(exist_ok=True)
-    (outputs_dir / "tables").mkdir(exist_ok=True)
+    tables_dir = outputs_dir / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
 
-    from qmlfakenews.data import load_facebook_factcheck_csv, engineer_facebook_factcheck_features, make_train_test_split
-    from sklearn.decomposition import PCA
-    from sklearn.preprocessing import StandardScaler
-    
-    df = load_facebook_factcheck_csv(data_dir / "facebook-fact-check.csv")
-    X, y, feature_names = engineer_facebook_factcheck_features(df)
-    
-    X = StandardScaler().fit_transform(X)
-    X = PCA(n_components=2, random_state=42).fit_transform(X)
-    
-    split = make_train_test_split(X, y, ["PC1", "PC2"], test_size=0.2, random_seed=42)
+    print(f"Loading data from {data_csv}...")
+    df = load_facebook_factcheck_csv(data_csv)
+    X, y, feature_names = preprocess_facebook_factcheck(df)
+    split = make_train_test_split(X, y, feature_names, test_size=0.25, random_seed=42)
 
-    print("Evaluating Pauli-XYZ Gram Matrix for N=250...")
-    factory = QuantumKernelFactory("pauli_xyz", num_qubits=2, reps=2)
-    kernel = factory.build()
+    # Match the paper's full-preset geometry pool and quantum preprocessing.
+    pca_q = fit_transform_pca(split.X_train, split.X_test, n_components=2, for_quantum=True)
+    Xq_train = pad_or_trim_features(pca_q.X_train, 2)
+    pool_n = min(400, len(Xq_train))
+    subset_sizes = (100, 150, 200, 250)
+    if pool_n < max(subset_sizes):
+        raise ValueError(f"Need at least {max(subset_sizes)} training examples; found {pool_n}.")
 
-    np.random.seed(42)
-    diag_idx = np.random.choice(len(split.X_train), size=250, replace=False)
-    X_diag = split.X_train[diag_idx]
-    y_diag = split.y_train[diag_idx]
+    pool_splitter = StratifiedShuffleSplit(n_splits=1, train_size=pool_n, random_state=42)
+    pool_idx, _ = next(pool_splitter.split(Xq_train, split.y_train))
+    X_pool = Xq_train[pool_idx]
+    y_pool = split.y_train[pool_idx]
 
-    K = np.asarray(kernel.evaluate(x_vec=X_diag, y_vec=X_diag), dtype=float)
+    print(f"Evaluating Pauli-XYZ Gram matrix for a stratified pool of n={pool_n}...")
+    kernel = QuantumKernelFactory("pauli_xyz", num_qubits=2, reps=2, seed=42).build()
+    K_pool = np.asarray(kernel.evaluate(x_vec=X_pool, y_vec=X_pool), dtype=float)
 
-    print("Computing subsets...")
-    variance_rows = []
-    subset_sizes = [100, 150, 200, 250]
-    num_trials = 5
-
+    print("Computing five random subsets for each size...")
+    rng = np.random.default_rng(42)
+    rows: list[dict[str, float | int]] = []
     for size in subset_sizes:
-        for trial in range(num_trials if size < 250 else 1):
-            if size == 250:
-                idx = np.arange(250)
-            else:
-                idx = np.random.choice(250, size=size, replace=False)
-            
-            K_sub = K[idx][:, idx]
-            y_sub = y_diag[idx]
-            
-            align = kernel_target_alignment(K_sub, y_sub, centered=True)
+        for trial in range(5):
+            idx = rng.choice(pool_n, size=size, replace=False)
+            K_sub = K_pool[np.ix_(idx, idx)]
+            y_sub = y_pool[idx]
             spec = spectrum_stats(K_sub, centered=True)
-            
-            variance_rows.append({
-                "subset_size": size,
-                "trial": trial,
-                "kernel_alignment": align,
-                "condition_number": spec.condition_number,
-                "spectral_gap": spec.spectral_gap
-            })
+            rows.append(
+                {
+                    "subset_size": size,
+                    "trial": trial,
+                    "pool_size": pool_n,
+                    "kernel_alignment": kernel_target_alignment(K_sub, y_sub, centered=True),
+                    "condition_number": spec.condition_number,
+                    "spectral_gap": spec.spectral_gap,
+                }
+            )
 
-    var_df = pd.DataFrame(variance_rows)
-    var_df.to_csv(outputs_dir / "tables" / "diagnostic_variance.csv", index=False)
-    print("Done! Saved to diagnostic_variance.csv")
+    out_path = tables_dir / "diagnostic_variance.csv"
+    pd.DataFrame(rows).to_csv(out_path, index=False)
+    print(f"Saved {len(rows)} trials to {out_path}.")
+
 
 if __name__ == "__main__":
     main()
