@@ -1,0 +1,176 @@
+{
+  "dataset_path": "E:\\QML-Fake-Newws\\QML-Fake_News_Paper\\data\\facebook-fact-check.csv",
+  "dataset_samples": 2016,
+  "random_seed_main": 42,
+  "split": {
+    "test_size": 0.25,
+    "stratified": true
+  },
+  "preprocessing": {
+    "drop_columns": [
+      "Debate",
+      "account_id",
+      "post_id",
+      "Post URL"
+    ],
+    "missing_values": {
+      "share_count": "fill with 0",
+      "reaction_count": "drop row",
+      "comment_count": "drop row"
+    },
+    "excluded_rating": "no factual content",
+    "label_mapping": {
+      "mostly true": 1,
+      "mostly false": -1,
+      "mixture of true and false": -1
+    },
+    "categorical_columns": [
+      "Category",
+      "Page",
+      "Date Published",
+      "Post Type"
+    ],
+    "categorical_encoding": "scikit-learn LabelEncoder applied before the train/test split",
+    "pca": "scikit-learn PCA; fit on training split, transform held-out split; random_state=42",
+    "quantum_scaling": "MinMaxScaler(feature_range=(0, pi)) fitted after PCA on training split",
+    "classical_pca_scaling": "StandardScaler fitted after PCA on training split",
+    "qubit_dimension_mismatch": "truncate excess PCA components or zero-pad missing components",
+    "engineered_classical_features": "engagement counts; log1p counts and totals; safe count ratios and engagement fractions; publication year/month/day-of-week; top-20 Category and Post Type one-hot indicators with other category",
+    "polynomial_classical_features": "degree-2 PolynomialFeatures with include_bias=False"
+  },
+  "classical_baselines": {
+    "logistic_regression": {
+      "max_iter": 5000,
+      "class_weight": "balanced"
+    },
+    "random_forest": {
+      "n_estimators": 500,
+      "random_state": 42,
+      "class_weight": "balanced_subsample"
+    },
+    "rbf_svc": {
+      "kernel": "rbf",
+      "C": 1.0,
+      "gamma": "scale"
+    },
+    "metrics_positive_label": 1,
+    "five_fold_cv": "StratifiedKFold(shuffle=True, random_state=42); PCA(2) is fitted before folds, while full-feature scaler is fit within fold pipelines"
+  },
+  "quantum_implementation": {
+    "kernel": "squared state fidelity |<phi(x)|phi(z)>|^2",
+    "ideal_backend": "exact Qiskit statevector simulation with cached feature states",
+    "feature_maps": {
+      "z": "Qiskit ZFeatureMap",
+      "zz": "Qiskit ZZFeatureMap; linear entanglement",
+      "pauli_xyz": "Qiskit PauliFeatureMap; paulis X,Y,Z; full entanglement",
+      "ry_custom": "one-layer circuit with one RY(theta_i) per qubit; reps does not alter this circuit"
+    },
+    "pegasos": {
+      "lambda": 0.02,
+      "main_updates": 200,
+      "sampling": "one uniform training example per update; seeded NumPy generator; update on margin < 1"
+    }
+  },
+  "preset": "full",
+  "quick": false,
+  "pca_components": [
+    2,
+    3,
+    4
+  ],
+  "qubits": [
+    2,
+    3,
+    4
+  ],
+  "feature_maps": [
+    "z",
+    "zz",
+    "pauli_xyz",
+    "ry_custom"
+  ],
+  "repetitions": [
+    1,
+    2,
+    4,
+    6
+  ],
+  "pegasos_iterations_main": 200,
+  "pegasos_lambda": 0.02,
+  "geometry_subset_n": 400,
+  "condition_number": "largest positive eigenvalue / smallest positive eigenvalue after centering and diagonal ridge 1e-8",
+  "spectral_gap": "largest eigenvalue - second-largest eigenvalue after centering and diagonal ridge 1e-8",
+  "noise": {
+    "probabilities": [
+      0.0,
+      0.001,
+      0.005,
+      0.01,
+      0.02
+    ],
+    "shots": 512,
+    "pegasos_iterations": 40,
+    "stratified_training_subset_n": 60,
+    "kernel_statistics_subset_n": 30,
+    "test_split": "full held-out test split",
+    "simulator": "AerSimulator with depolarizing gate errors",
+    "method": "Qiskit ComputeUncompute with BackendSamplerV2",
+    "one_qubit_error": "depolarizing_error(p, 1) on rx, ry, rz, x, y, z, h, s, sdg, t, tdg",
+    "two_qubit_error": "depolarizing_error(min(1, 2*p), 2) on cx, cz, swap",
+    "transpiler_optimization_level": 1,
+    "hardware_calibrated": false
+  },
+  "software": {
+    "python": "3.12.2",
+    "numpy": "2.3.3",
+    "pandas": "2.3.3",
+    "scikit_learn": "1.7.2",
+    "qiskit": "1.4.5",
+    "qiskit_machine_learning": "0.8.4",
+    "qiskit_aer": "0.17.2"
+  },
+  "geometry_sweep": {
+    "rows": 25,
+    "distinct_model_settings": 24,
+    "deduplication_fields": [
+      "feature_map",
+      "reps",
+      "pca_components",
+      "qubits",
+      "pegasos_iterations"
+    ],
+    "distinct_settings_by_qubits": {
+      "2": 18,
+      "3": 3,
+      "4": 3
+    },
+    "design": "Feature-map and depth sweeps fix qubits=2; Pauli-XYZ PCA/qubit tradeoff spans 2, 3, and 4 qubits at PCA dimensions 2, 3, and 4."
+  },
+  "seed_sweep_support_counts": {
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "split": "stratified 75/25; paired by seed",
+    "pca_components": 2,
+    "classical_model": "RBF SVC, C=1.0, gamma=scale, on StandardScaler-transformed PCA features",
+    "classical_count": "sum of scikit-learn SVC n_support_ across classes",
+    "quantum_model": "Pauli-XYZ quantum kernel, 2 qubits, 2 repetitions, Pegasos lambda=0.02, 100 sampled updates",
+    "quantum_input_scaling": "MinMaxScaler to [0, pi] after PCA",
+    "quantum_count": "distinct training examples added to Pegasos active set after a margin-violating update",
+    "count_comparison": "descriptive solver-specific counts only; no ratio, significance test, or efficiency claim"
+  },
+  "cross_dataset_scope": {
+    "generalization_established": false,
+    "breast_cancer": "classification sanity check only; fake-news geometry protocol not replicated",
+    "welfake_liar": "excluded from claims and manuscript tables due to conflicting runs and incomplete provenance"
+  }
+}
